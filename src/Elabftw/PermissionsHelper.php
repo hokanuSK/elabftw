@@ -14,13 +14,14 @@ namespace Elabftw\Elabftw;
 
 use Elabftw\Enums\BasePermissions;
 use Elabftw\Exceptions\UnprocessableContentException;
-use Elabftw\Exceptions\ImproperActionException;
 use Elabftw\Models\Config;
 use Elabftw\Models\TeamGroups;
 use Elabftw\Models\Teams;
 
 use function array_flip;
 use function array_map;
+use function array_key_exists;
+use function json_decode;
 
 /**
  * Help with translation of permission json into meaningful data
@@ -35,11 +36,9 @@ final class PermissionsHelper
         $permArr = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         $result = array();
 
-        $base = BasePermissions::tryFrom($permArr['base']) ?? throw new ImproperActionException('Invalid base parameter for permissions');
-        $result['base'] = $base->toHuman();
-        $result['teams'] = $Teams->readNamesFromIds($permArr['teams']);
-        $result['teamgroups'] = $TeamGroups->readNamesFromIds($permArr['teamgroups']);
-        $result['users'] = $Teams->Users->readNamesFromIds($permArr['users']);
+        $result['teams'] = $Teams->readNamesFromIds($permArr['teams'] ?? array());
+        $result['teamgroups'] = $TeamGroups->readNamesFromIds($permArr['teamgroups'] ?? array());
+        $result['users'] = $Teams->Users->readNamesFromIds($permArr['users'] ?? array());
 
         return $result;
     }

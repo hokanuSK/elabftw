@@ -7,7 +7,7 @@
  */
 import $ from 'jquery';
 import { ApiC } from './api';
-import { Malle, InputType, Action as MalleAction, SelectOptions } from '@deltablot/malle';
+import { Malle, InputType, SelectOptions } from '@deltablot/malle';
 import 'bootstrap/js/src/modal.js';
 import FavTag from './FavTag.class';
 import { clearLocalStorage, rememberLastSelected, selectLastSelected } from './localStorage';
@@ -18,6 +18,7 @@ import {
   escapeExtendedQuery,
   generateMetadataLink,
   handleReloads,
+  getSafeElementById,
   getRandomColor,
   listenTrigger,
   makeSortableGreatAgain,
@@ -33,11 +34,12 @@ import {
   TomSelect,
   updateEntityBody,
   updateCatStat,
+  makeMalleableColumnsGreatAgain, rebuildTomSelectOptions,
 } from './misc';
 import i18next from './i18n';
 import { Metadata } from './Metadata.class';
 import { DateTime } from 'luxon';
-import { Action, EntityType, Model, LinkSubModel, Target } from './interfaces';
+import { Action, EntityType, Model, LinkSubModel } from './interfaces';
 import { MathJaxObject } from 'mathjax-full/js/components/startup';
 declare const MathJax: MathJaxObject;
 import 'bootstrap-markdown-fa5/js/bootstrap-markdown';
@@ -71,7 +73,20 @@ interface Status extends SelectOptions {
   id: number;
   color: string;
   title: string;
+  is_current_team: number;
 }
+
+on('toggle-dark-mode', (el: HTMLElement) => {
+  const currentTheme = parseInt(el.dataset.currentTheme, 10);
+  // Auto (0) and Light (1) should both toggle to Dark (2)
+  const targetTheme = currentTheme === 2 ? 1 : 2;
+  ApiC.patch(`${Model.User}/me`, { theme_variant: targetTheme }).then(() => {
+    const isDark = targetTheme === 2;
+    document.documentElement.classList.toggle('dark-mode', isDark);
+    document.cookie = `theme_variant=${targetTheme}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+    el.dataset.currentTheme = String(targetTheme);
+  });
+});
 
 // HEARTBEAT
 // this function is to check periodically that we are still authenticated
@@ -140,7 +155,7 @@ const btn = document.createElement('button');
 btn.type = 'button';
 btn.dataset.action = 'scroll-top';
 // make it look like a button, and on the right side of the screen, not too close from the bottom
-btn.classList.add('btn', 'btn-neutral', 'floating-middle-right');
+btn.classList.add('btn', 'btn-secondary', 'floating-middle-right');
 // element is invisible at first so we can make it visible so it triggers a css transition and appears progressively
 btn.style.opacity = '0';
 // will not be shown for small screens, only large ones
@@ -188,36 +203,151 @@ if (needFocus) {
   needFocus.focus();
 }
 
-// Listen for malleable columns
-new Malle({
-  onEdit: (original, _, input) => {
-    if (original.innerText === 'unset') {
-      input.value = '';
-      original.classList.remove('font-italic');
-    }
-    if (original.dataset.inputType === 'number') {
-      // use setAttribute here because type is readonly property
-      input.setAttribute('type', 'number');
-    }
-    return true;
-  },
-  cancel : i18next.t('cancel'),
-  cancelClasses: ['btn', 'btn-danger', 'mt-2', 'ml-1'],
-  inputClasses: ['form-control'],
-  fun: (value, original) => {
-    const params = {};
-    params[original.dataset.target] = value;
-    return ApiC.patch(`${original.dataset.endpoint}/${original.dataset.id}`, params)
-      .then(res => res.json())
-      .then(json => json[original.dataset.target]);
-  },
-  listenOn: '.malleableColumn',
-  returnedValueIsTrustedHtml: false,
-  submit : i18next.t('save'),
-  submitClasses: ['btn', 'btn-primary', 'mt-2'],
-  tooltip: i18next.t('click-to-edit'),
-}).listen();
+// START SAFARI DETECTION
+// iOS browsers often look like Safari UA; exclude by tokens:
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent
+const FORBIDDEN_UA_TOKENS = [
+  'Chrome',
+  'CriOS',
+  'Edg',
+  'EdgiOS',
+  'OPT',
+  'OPiOS',
+  'Firefox',
+  'FxiOS',
+  'SamsungBrowser',
+];
 
+const isSafari = (): boolean => {
+  const ua = navigator.userAgent ?? '';
+  const vendor = navigator.vendor ?? '';
+
+  if (vendor !== 'Apple Computer, Inc.') return false;
+  if (!ua.includes('Safari/')) return false;
+  if (!ua.includes('Version/')) return false;
+
+  for (const token of FORBIDDEN_UA_TOKENS) {
+    if (ua.includes(token)) return false;
+  }
+  return true;
+};
+
+const isDismissedSafari = localStorage.getItem('dismiss_safari_warning_v1') === '1';
+if (isSafari() && !isDismissedSafari) {
+  document.getElementById('safariWarning').removeAttribute('hidden');
+}
+// END SAFARI DETECTION
+
+// generic announcement/admin announcement messages
+document.querySelectorAll('[data-dismiss-key]').forEach((msg: HTMLElement) => {
+  if (localStorage.getItem(`dismiss_${msg.dataset.dismissKey}`) !== '1') {
+    msg.parentElement.removeAttribute('hidden');
+  }
+});
+
+makeMalleableColumnsGreatAgain();
+
+// selector for all {permission}_select (canread, canwrite, canbook)
+const permissionSelects = document.querySelectorAll<HTMLSelectElement>(
+  '[id$="_select_teamgroups"], [id$="_select_teams"], [id$="_select_users"]',
+);
+
+function initPermissionsTomSelects() {
+  if (permissionSelects.length === 0) return;
+  permissionSelects.forEach((select) => {
+    const tsSelect = select as HTMLSelectElement & { tomselect?: TomSelect };
+    // avoid re-init of tomselect if already exists
+    if (tsSelect.tomselect) return;
+    const config = {
+      plugins: {
+        no_backspace_delete: {},
+        remove_button: {},
+      },
+      // display many things or users will be confused what they search is not displayed right away
+      maxOptions: 2222,
+      onInitialize() { setSelectedItemsDivVisibility(this); },
+      onItemAdd() {
+        this.setTextboxValue('');
+        setSelectedItemsDivVisibility(this);
+      },
+      onItemRemove() { setSelectedItemsDivVisibility(this); },
+    };
+    const wrapper = select.closest('.ts-wrapper');
+    config['dropdownParent'] = wrapper;
+    config['controlInput'] = wrapper?.querySelector('input');
+    // for users, we return a formatted response with id - user (email)
+    if (select.id.endsWith('_select_users')) {
+      config['load'] = (query: string, callback) => {
+        if (!query.length) return callback();
+        fetchUsers(query).then(callback).catch(() => callback());
+      };
+    }
+    new TomSelect(select, config);
+  });
+}
+
+initPermissionsTomSelects();
+
+// make the div holding selected items disappear when empty and vice versa.
+function setSelectedItemsDivVisibility(instance) {
+  instance.control.style.display = instance.items.length ? 'flex' : 'none';
+}
+
+// fetch users and return in an id - username (email) format
+async function fetchUsers(query: string) {
+  const users = await ApiC.getJson(`/users/search?q=${encodeURIComponent(query)}`);
+  return users.map((u) => ({
+    value: `user:${u.userid}`,
+    text: `${u.fullname} (${u.email})`,
+  }));
+}
+
+on('team-scope-change', async (el: HTMLElement) => {
+  const scope = Number(el.dataset.value);
+  const identifier = el.dataset.identifier;
+  if (!identifier) return;
+  // custom scope button for team select
+  const menu = el.parentElement;
+  if (menu) {
+    menu.querySelectorAll('.dropdown-item').forEach((item) => {
+      item.classList.remove('active');
+      item.querySelector('i')?.classList.remove('color-white');
+    });
+  }
+  el.classList.add('active');
+  el.querySelector('i')?.classList.add('color-white');
+
+  const btn = el.closest('.btn-group')?.querySelector('button.dropdown-toggle');
+  if (btn) {
+    // clear existing content
+    btn.replaceChildren();
+    const icon = document.createElement('i');
+    icon.classList.add('fas', 'fa-fw', scope === 1 ? 'fa-user' : 'fa-globe', 'mx-1');
+    const text = document.createTextNode(scope === 1 ? i18next.t('my-teams') : i18next.t('all-teams'));
+    btn.append(text, icon);
+  }
+  let teams = [];
+
+  if (scope === 1) {
+    const user = await ApiC.getJson(`${Model.User}/me`);
+    teams = user.teams;
+  } else {
+    const allTeams = await ApiC.getJson('teams');
+    teams = allTeams.filter((t) => t.visible !== 0);
+  }
+  const select = document.querySelector(`#${identifier}_select_teams`) as HTMLSelectElement;
+  if (!select) return;
+  rebuildTomSelectOptions(select, {
+    options: teams.map(team => ({
+      value: `team:${team.id}`,
+      text: team.name,
+    })),
+  });
+});
+
+document.addEventListener('scope-changed', () => {
+  permissionSelects.forEach(select => rebuildTomSelectOptions(select));
+});
 
 // tom-select for team selection on login and register page, and idp selection
 ['init_team_select', 'team', 'team_selection_select', 'idp_login_select'].forEach(id =>{
@@ -230,40 +360,19 @@ new Malle({
       // we also remember the last selected one in localStorage
       onChange: rememberLastSelected(id),
       onInitialize: selectLastSelected(id),
+      // users get confused when their team doesn't show up (default is 50)
+      // so make it huge because otherwise one needs to explain that user needs to type to start filtering team names
+      // but users don't know how to type, only click and scroll, so it doesn't come to their mind.
+      maxOptions: 2222,
     });
   }
 });
 
-// MALLEABLE QTY_UNIT - we need a specific code to add the select options
-new Malle({
-  cancel : i18next.t('cancel'),
-  cancelClasses: ['btn', 'btn-danger', 'mt-2', 'ml-1'],
-  inputClasses: ['form-control'],
-  inputType: InputType.Select,
-  selectOptions: [
-    {selected: false, text: '•', value: '•'},
-    {selected: false, text: 'μL', value: 'μL'},
-    {selected: false, text: 'mL', value: 'mL'},
-    {selected: false, text: 'L', value: 'L'},
-    {selected: false, text: 'μg', value: 'μg'},
-    {selected: false, text: 'mg', value: 'mg'},
-    {selected: false, text: 'g', value: 'g'},
-    {selected: false, text: 'kg', value: 'kg'},
-  ],
-  fun: (value, original) => {
-    return ApiC.patch(`${original.dataset.endpoint}/${original.dataset.id}`, {qty_unit: value})
-      .then(res => res.json())
-      .then(json => json['qty_unit']);
-  },
-  listenOn: '.malleableQtyUnit',
-  returnedValueIsTrustedHtml: false,
-  submit : i18next.t('save'),
-  submitClasses: ['btn', 'btn-primary', 'mt-2'],
-  tooltip: i18next.t('click-to-edit'),
-}).listen();
-
 // only on entity page
 const pageMode = new URLSearchParams(document.location.search).get('mode');
+
+notify.flashSuccess();
+
 if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'edit')) {
   // MALLEABLE ENTITY TITLE
   new Malle({
@@ -289,14 +398,13 @@ if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'ed
         .then(res => res.json())
         .then(json => json[original.dataset.target]);
     },
-    listenOn: '.malleableTitle',
+    listenOn: '.malleable-title',
     returnedValueIsTrustedHtml: false,
-    onBlur: MalleAction.Submit,
     tooltip: i18next.t('click-to-edit'),
   }).listen();
 
   // CATEGORY AND STATUS
-  const notsetOpts = {id: null, title: i18next.t('not-set'), color: 'bdbdbd'};
+  const notsetOpts = {id: null, title: i18next.t('not-set'), color: 'bdbdbd', is_current_team: 1};
   let statusEndpoint = `${Model.Team}/current/items_status`;
   let categoryEndpoint = `${Model.Team}/current/resources_categories`;
   if (entity.type === EntityType.Experiment || entity.type === EntityType.Template) {
@@ -307,7 +415,7 @@ if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'ed
   // this is a cache for category or status for malle
   const optionsCache = [];
   // this promise will fetch the categories or status on click
-  const getCatStatArr = (endpoint: string): Promise<SelectOptions[]> => {
+  const getCatStatArr = (endpoint: string): Promise<Status[]> => {
     if (!optionsCache[endpoint]) {
       optionsCache[endpoint] = ApiC.getJson(`${endpoint}?limit=9000`)
         .then(json => {
@@ -342,8 +450,6 @@ if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'ed
       }
       return true;
     },
-    cancel : i18next.t('cancel'),
-    cancelClasses: ['btn', 'btn-danger', 'ml-1'],
     inputClasses: ['form-control', 'ml-2'],
     formClasses: ['form-inline'],
     fun: (value: string, original: HTMLElement) => updateCatStat(original.dataset.target, entity, value).then(color => {
@@ -353,11 +459,11 @@ if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'ed
     inputType: InputType.Select,
     selectOptionsValueKey: 'id',
     selectOptionsTextKey: 'title',
-    selectOptions: () => getCatStatArr(statusEndpoint),
+    selectOptions: async () =>
+      ((await getCatStatArr(statusEndpoint)) as Status[])
+        .filter((status: Status) => status.is_current_team === 1),
     listenOn: '.malleableStatus',
     returnedValueIsTrustedHtml: false,
-    submit : i18next.t('save'),
-    submitClasses: ['btn', 'btn-primary', 'ml-1'],
     tooltip: i18next.t('click-to-edit'),
   }).listen();
 
@@ -371,19 +477,17 @@ if (entity.type !== EntityType.Other && (pageMode === 'view' || pageMode === 'ed
       elem.style.setProperty('--bg', `#${splitValue[1]}`);
       return true;
     },
-    cancel : i18next.t('cancel'),
-    cancelClasses: ['btn', 'btn-danger', 'mx-1'],
     inputClasses: ['form-control'],
     formClasses: ['form-inline'],
     fun: (value: string, original: HTMLElement) => updateCatStat(original.dataset.target, entity, value),
     inputType: InputType.Select,
     selectOptionsValueKey: 'id',
     selectOptionsTextKey: 'title',
-    selectOptions: () => getCatStatArr(categoryEndpoint),
+    selectOptions: async () =>
+      ((await getCatStatArr(categoryEndpoint)) as Status[])
+        .filter((cat: Status) => cat.is_current_team === 1),
     listenOn: '.malleableCategory',
     returnedValueIsTrustedHtml: false,
-    submit : i18next.t('save'),
-    submitClasses: ['btn', 'btn-primary', 'ml-1'],
     tooltip: i18next.t('click-to-edit'),
   }).listen();
 }
@@ -480,9 +584,13 @@ on('show-policy', (el: HTMLElement) => {
 
 on('reload-on-click', (el: HTMLElement) => reloadElements([el.dataset.target]));
 on('switch-editor', () => getEditor().switch(entity).then(() => window.location.reload()));
-on('destroy-favtags', (el: HTMLElement) => ApiC.delete(`${Model.FavTag}/${el.dataset.id}`).then(() => reloadElements(['favtagsTagsDiv'])));
+on('destroy-favtags', (el: HTMLElement) => {
+  if (confirm(i18next.t('generic-delete-warning'))) {
+    ApiC.delete(`${Model.FavTag}/${el.dataset.id}`).then(() => reloadElements(['favtagsTagsDiv']));
+  }
+});
 
-on('insert-param-and-reload', (el: HTMLElement) => {
+on('insert-param-and-reload', async (el: HTMLElement) => {
   const params = new URLSearchParams(document.location.search.slice(1));
   const target = el.dataset.target;
   const value = (el as HTMLInputElement).value;
@@ -493,7 +601,14 @@ on('insert-param-and-reload', (el: HTMLElement) => {
     params.delete(target);
   }
   window.history.replaceState({}, '', `?${params.toString()}`);
-  handleReloads(el.dataset.reload);
+  await handleReloads(el.dataset.reload);
+});
+
+// used on displayMessage divs: we save the fact that it was closed
+on('save-dismiss', (el: HTMLElement) => {
+  if (el.dataset.dismissKey) {
+    localStorage.setItem(`dismiss_${el.dataset.dismissKey}`, '1');
+  }
 });
 
 on('add-query-filter', (el: HTMLElement) => {
@@ -533,58 +648,59 @@ on('toggle-pin', (el: HTMLElement) => {
   });
 });
 
-on('transfer-ownership', () => {
-  const value = (document.getElementById('target_owner') as HTMLInputElement).value;
-  const params = {};
-  params[Target.UserId] = parseInt(value.split(' ')[0], 10);
-  ApiC.patch(`${entity.type}/${entity.id}`, params).then(() => window.location.reload());
+/*
+ * Enable/disable dependent container based on its toggle
+ * example usage:
+ * <input type='checkbox' data-action='toggle-dependent' data-target-toggle='divToDisable' />
+ * <div id='divToDisable'><input type='text' value='abcd'></div>
+ */
+on('toggle-dependent', (el: HTMLInputElement) => {
+  const targetId = el.dataset.targetToggle;
+  if (!targetId) return;
+  const container = document.getElementById(targetId);
+  if (!container) return;
+  const disabled = !el.checked;
+  container.style.opacity = disabled ? '0.5' : '';
+  container
+    .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')
+    .forEach(input => {
+      input.disabled = disabled;
+    });
+});
+
+on('save-booking-settings', async (_, e:Event): Promise<void | Response> => {
+  e.preventDefault();
+  const form = document.getElementById('editBookingParamsForm') as HTMLFormElement;
+  const params = collectForm(form);
+  await ApiC.patch(`items/${form.dataset.itemId}`, params);
+  reloadElements(['topToolbar', 'permissionsDiv']);
+  $('#bookingParamsModal').modal('hide');
+});
+
+on('transfer-ownership', async (_, e:Event) => {
+  e.preventDefault();
+  const params = collectForm(document.getElementById('ownershipTransferForm'));
+  if (!params['targetUserId'] || !params['targetTeamId']) {
+    return;
+  }
+  const userid = Number.parseInt(String(params['targetUserId']).split(' ')[0], 10);
+  const team = Number.parseInt(String(params['targetTeamId']), 10);
+  ApiC.notifOnSaved = false;
+  await ApiC.patch(`${entity.type}/${entity.id}`, { action: Action.UpdateOwner, userid, team });
+  sessionStorage.setItem('flash_ownershipTransfer', i18next.t('ownership-transfer'));
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes('experiment')) {
+    window.location.href = 'experiments.php';
+  } else if (path.includes('database') || path.includes('resource')) {
+    window.location.href = 'database.php';
+  } else {
+    window.location.href = 'dashboard.php';
+  }
 });
 
 on(Action.Restore, () => {
   ApiC.patch(`${entity.type}/${entity.id}`, { action: Action.Restore })
     .then(() => window.location.href = `?mode=view&id=${entity.id}`);
-});
-
-on('add-user-to-permissions', (el: HTMLElement) => {
-  // collect userid + name + email from input
-  const addUserPermissionsInput = (document.getElementById(`${el.dataset.identifier}_select_users`) as HTMLInputElement);
-  const userid = parseInt(addUserPermissionsInput.value, 10);
-  if (isNaN(userid)) {
-    notify.error('add-user-error');
-    return;
-  }
-  const userName = addUserPermissionsInput.value.split(' - ')[1];
-
-  // create a new li element in the list of existing users, so it is collected at Save action
-  const li = document.createElement('li');
-  li.classList.add('list-group-item');
-  li.dataset.id = String(userid);
-
-  // eye or pencil icon
-  const rwIcon = document.createElement('i');
-  rwIcon.classList.add('fas');
-  const iconClass = el.dataset.rw === 'canread' ? 'eye' : 'pencil-alt';
-  rwIcon.classList.add(`fa-${iconClass}`);
-
-  // delete icon
-  const deleteSpan = document.createElement('span');
-  deleteSpan.dataset.action = 'remove-parent';
-  deleteSpan.classList.add('hover-danger');
-  const xIcon = document.createElement('i');
-  xIcon.classList.add('fas');
-  xIcon.classList.add('fa-xmark');
-  deleteSpan.insertAdjacentElement('afterbegin', xIcon);
-
-  // construct the li element with all its content
-  li.insertAdjacentElement('afterbegin', rwIcon);
-  li.insertAdjacentText('beforeend', ' ' + userName + ' ');
-  li.insertAdjacentElement('beforeend', deleteSpan);
-
-  // and insert it into the list
-  document.getElementById(`${el.dataset.identifier}_list_users`).appendChild(li);
-
-  // clear input
-  addUserPermissionsInput.value = '';
 });
 
 on('reload-page', () => location.reload());
@@ -598,16 +714,14 @@ on('clear-form', (el: HTMLElement) => {
 
 on('save-permissions', (el: HTMLElement) => {
   const params = {};
-  // collect existing users listed in ul->li, and store them in a string[] with user:<userid>
-  const existingUsers = Array.from(document.getElementById(`${el.dataset.identifier}_list_users`).children)
-    .map(u => `user:${(u as HTMLElement).dataset.id}`);
 
   params[el.dataset.rw] = permissionsToJson(
-    parseInt(($('#' + el.dataset.identifier + '_select_base').val() as string), 10),
     ($('#' + el.dataset.identifier + '_select_teams').val() as string[])
       .concat($('#' + el.dataset.identifier + '_select_teamgroups').val() as string[])
-      .concat(existingUsers),
+      .concat($('#' + el.dataset.identifier + '_select_users').val() as string[]),
   );
+  const baseSelect = getSafeElementById(`${el.dataset.identifier}_select_base`) as HTMLSelectElement;
+  params[baseSelect.name] = baseSelect.value;
   // if we're editing the default read/write permissions for experiments, this data attribute will be set
   if (el.dataset.isUserDefault) {
     // we need to replace canread/canwrite with default_read/default_write for user attribute
@@ -940,9 +1054,15 @@ on('toggle-password', (el: HTMLElement) => {
 });
 
 on('logout', () => {
-  clearLocalStorage();
+  localStorage.setItem('logout_msg', '1');
   window.location.href = 'app/logout.php';
 });
+
+const logoutMessageDiv = document.getElementById('logoutMessage');
+if (logoutMessageDiv  && localStorage.getItem('logout_msg')) {
+  logoutMessageDiv.removeAttribute('hidden');
+  clearLocalStorage();
+}
 
 on('ack-notif', (el: HTMLElement) => {
   if (el.parentElement.dataset.ack === '0') {
@@ -1009,10 +1129,6 @@ on('toggle-anonymous-access', () => {
 });
 
 on('reload-color', (el: HTMLElement) => {
-  el.classList.add('flash');
-  setTimeout(() => {
-    el.classList.remove('flash');
-  }, 100);
   (el.nextElementSibling as HTMLInputElement).value = getRandomColor();
 });
 
@@ -1163,7 +1279,22 @@ on('autocomplete', (el: HTMLElement) => {
       const queryTerm = ['experiments', 'items'].includes(el.dataset.target)
         ? escapeExtendedQuery(term)
         : term;
-      ApiC.getJson(`${el.dataset.target}/?q=${encodeURIComponent(queryTerm)}`).then(json => {
+
+      const params = new URLSearchParams();
+      params.set('q', queryTerm);
+
+      // allow filtering users within a specific team
+      if (el.dataset.team) {
+        const teamId = document.getElementById(el.dataset.team) as HTMLInputElement | HTMLSelectElement;
+        if (teamId?.value) {
+          params.set('team', teamId.value);
+        }
+      }
+      ApiC.getJson(`${el.dataset.target}/?${params.toString()}`).then(json => {
+        if (!Array.isArray(json) || json.length === 0) {
+          response([i18next.t('not-found')]);
+          return;
+        }
         response(json.map(entry => transformer(entry)));
       });
     },
@@ -1179,16 +1310,17 @@ on('query', (el: HTMLElement) => {
   window.location.href = url.href;
 });
 
-on('notify-surrounding-bookers', (el: HTMLElement, event: Event) => {
+on(Action.EmailBookers, (el: HTMLElement, event: Event) => {
   event.preventDefault();
   const form = document.getElementById('notifySurroundingBookersForm') as HTMLFormElement;
   const params = collectForm(form);
-  params['action'] = Action.Notif;
+  params['action'] = Action.EmailBookers;
+  params['entity_id'] = entity.id;
   const button = (el as HTMLButtonElement);
   const buttonText = button.innerText;
   button.disabled = true;
   button.innerText = i18next.t('please-wait');
-  ApiC.post(`${entity.type}/${entity.id}`, params).then(() => {
+  ApiC.post('instance', params).then(() => {
     form.reset();
     $('#sendBookingsEmailModal').modal('hide');
     button.innerText = buttonText;
@@ -1208,7 +1340,7 @@ on('delete-compounds', (el: HTMLElement) => {
   document.dispatchEvent(new CustomEvent('dataReload'));
 });
 
-on('scope-change', (el: HTMLElement) => {
+on('scope-change', async (el: HTMLElement) => {
   // only set it in query if we want to, which prevents an issue on dashboard where value was taken from query param "scope"
   if (el.dataset.setQueryParam === '1') {
     const params = new URLSearchParams(document.location.search);
@@ -1217,9 +1349,9 @@ on('scope-change', (el: HTMLElement) => {
   }
   const userParams = {};
   userParams[el.dataset.target] = el.dataset.value;
-  ApiC.patch('users/me', userParams).then(() => {
-    handleReloads(el.dataset.reload);
-  });
+  await ApiC.patch('users/me', userParams);
+  await handleReloads(el.dataset.reload);
+  document.dispatchEvent(new Event('scope-changed'));
 });
 
 /**

@@ -20,7 +20,9 @@ export default class SidePanel {
     // make container great again
     $('#container').css('width', '100%').css('margin-left', 'auto');
     // hide panel
-    document.getElementById(this.panelId).toggleAttribute('hidden', true);
+    const panelId = document.getElementById(this.panelId);
+    if (!panelId) return;
+    panelId.toggleAttribute('hidden', true);
     // store the current state
     localStorage.removeItem('opened-sidepanel');
     const opener = document.getElementById(`${this.panelId}Opener`);
@@ -28,6 +30,7 @@ export default class SidePanel {
     opener.classList.remove('bounce-left');
     opener.classList.remove('sidepanel-opened');
     opener.classList.add('sidepanel-closed');
+    opener.setAttribute('aria-expanded', 'false');
   }
 
   show(): void {
@@ -41,6 +44,7 @@ export default class SidePanel {
     opener.classList.add('bounce-left');
     opener.classList.add('sidepanel-opened');
     opener.classList.remove('sidepanel-closed');
+    opener.setAttribute('aria-expanded', 'true');
   }
 
   // TOGGLE PANEL VISIBILITY

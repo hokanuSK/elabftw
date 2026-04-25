@@ -14,6 +14,7 @@ namespace Elabftw\Controllers;
 
 use Elabftw\Elabftw\App;
 use Elabftw\Elabftw\Env;
+use Elabftw\Elabftw\SchemaVersionChecker;
 use Elabftw\Enums\Action;
 use Elabftw\Enums\ApiEndpoint;
 use Elabftw\Enums\ApiSubModels;
@@ -84,6 +85,13 @@ use Override;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\Transport;
 
+use function implode;
+use function in_array;
+use function json_decode;
+use function sprintf;
+use function str_starts_with;
+use function trim;
+
 /**
  * For API V2 requests
  */
@@ -127,7 +135,7 @@ final class Apiv2Controller extends AbstractApiController
                 'message' => $e->getMessage(),
                 'description' => $e->getDescription(),
             );
-            return new JsonResponse($error, $error['code']);
+            return new JsonResponse($error, $e->getHttpCode());
         } catch (Exception $e) {
             $message = $e->getMessage();
             if ($e->getPrevious() !== null) {
@@ -207,8 +215,9 @@ final class Apiv2Controller extends AbstractApiController
             $this->reqBody['entity_type'] = $this->Request->request->get('entity_type'); // can be null
             $this->reqBody['category'] = $this->Request->request->get('category'); // can be null
             $this->reqBody['owner'] = $this->Request->request->getInt('owner');
-            $this->reqBody['canread'] = (BasePermissions::tryFrom($this->Request->request->getInt('canread')) ?? BasePermissions::Team)->toJson();
-            $this->reqBody['canwrite'] = (BasePermissions::tryFrom($this->Request->request->getInt('canwrite')) ?? BasePermissions::User)->toJson();
+            $this->reqBody['canread_base'] = (BasePermissions::tryFrom($this->Request->request->getInt('canread_base')) ?? BasePermissions::Team)->value;
+            $this->reqBody['canwrite_base'] = (BasePermissions::tryFrom($this->Request->request->getInt('canwrite_base')) ?? BasePermissions::User)->value;
+            $this->action = Action::tryFrom($this->Request->request->getString('action')) ?? Action::Create;
         }
         $id = $this->Model->postAction($this->action, $this->reqBody);
         return new Response('', Response::HTTP_CREATED, array('Location' => sprintf('%s/%s%d', Env::asUrl('SITE_URL'), $this->Model->getApiPath(), $id)));
@@ -297,7 +306,7 @@ final class Apiv2Controller extends AbstractApiController
             ApiEndpoint::Import => new ImportHandler($this->requester, App::getDefaultLogger()),
             ApiEndpoint::Info => new Info(),
             ApiEndpoint::Instance => new Instance($this->requester, $this->getEmail(), (bool) Config::getConfig()->configArr['email_send_grouped']),
-            ApiEndpoint::Export => new Exports($this->requester, Storage::EXPORTS->getStorage(), $this->id),
+            ApiEndpoint::Export => new Exports(App::getDefaultLogger(), $this->requester, Storage::EXPORTS->getStorage(), $this->id),
             ApiEndpoint::Experiments,
             ApiEndpoint::Items,
             ApiEndpoint::ExperimentsTemplates,
@@ -327,7 +336,7 @@ final class Apiv2Controller extends AbstractApiController
                 $this->requester,
                 $this->Request->query->get('scope') === 'team',
             ),
-            ApiEndpoint::Users => new Users($this->id, $this->requester->team, $this->requester),
+            ApiEndpoint::Users => new Users($this->id, $this->requester->getTeam(), $this->requester),
         };
     }
 
@@ -335,6 +344,7 @@ final class Apiv2Controller extends AbstractApiController
     {
         $Config = Config::getConfig();
         return new Email(
+            new SchemaVersionChecker((int) $Config->configArr['schema']),
             new Mailer(Transport::fromDsn($Config->getDsn())),
             App::getDefaultLogger(),
             $Config->configArr['mail_from'],
@@ -392,7 +402,7 @@ final class Apiv2Controller extends AbstractApiController
         }
         if ($this->Model instanceof Scheduler) {
             return match ($submodel) {
-                ApiSubModels::Notifications => new EventDeleted($this->Model->readOne(), $this->requester->userData['fullname']),
+                ApiSubModels::Notifications => new EventDeleted($this->requester, $this->Model->readOne(), $this->requester->userData['fullname']),
                 default => throw new InvalidApiSubModelException(ApiEndpoint::Event),
             };
         }

@@ -19,9 +19,14 @@ use Elabftw\Enums\Notifications;
 use Elabftw\Interfaces\MailableInterface;
 use Elabftw\Interfaces\QueryParamsInterface;
 use Elabftw\Interfaces\RestInterface;
+use Elabftw\Models\Users\Users;
 use Elabftw\Services\Email;
 use Elabftw\Services\Filter;
 use Override;
+
+use function _;
+use function count;
+use function sprintf;
 
 final class EventDeleted extends AbstractNotifications implements MailableInterface, RestInterface
 {
@@ -30,12 +35,13 @@ final class EventDeleted extends AbstractNotifications implements MailableInterf
     protected Notifications $category = Notifications::EventDeleted;
 
     public function __construct(
+        Users $targetUser,
         private array $event,
         private string $actor,
         private string $msg = '',
         private EmailTarget $target = EmailTarget::BookableItem,
     ) {
-        parent::__construct();
+        parent::__construct($targetUser);
     }
 
     #[Override]
@@ -58,9 +64,16 @@ final class EventDeleted extends AbstractNotifications implements MailableInterf
         }
         // target can be bookable_item, team or teamgroup
         $this->target = EmailTarget::from($reqBody['target']);
-        $userids = Email::getIdsOfRecipients($this->target, $reqBody['targetid']);
+        $range = array(
+            'direction' => $reqBody['range_direction'] ?? null,
+            'value' => $reqBody['range_value'] ?? null,
+            'unit' => $reqBody['range_unit'] ?? null,
+        );
+        $userids = Email::getIdsOfRecipients($this->target, $reqBody['targetid'], $range);
         foreach ($userids as $userid) {
-            $this->create($userid);
+            $recipient = new Users($userid);
+            $Notif = new self($recipient, $this->event, $this->actor, $this->msg, $this->target);
+            $Notif->create();
         }
         return count($userids);
     }
@@ -84,12 +97,11 @@ final class EventDeleted extends AbstractNotifications implements MailableInterf
         return false;
     }
 
-    // Note: here the actor fullname is directly fed to the instance, instead of fetching it from a new Users() like others.
     #[Override]
     public function getEmail(): array
     {
         $info = _('A booked slot was deleted from the scheduler.');
-        $url = Env::asUrl('SITE_URL') . '/team.php?item=' . $this->event['item'];
+        $url = Env::asUrl('SITE_URL') . '/scheduler.php?items[]=' . $this->event['item'];
         $body = sprintf(_('Hi. %s (%s). See item: %s. It was booked from %s to %s.'), $info, $this->actor, $url, $this->event['start'], $this->event['end']);
         if (!empty($this->msg)) {
             $body .= "\n\n" . _('Message:') . "\n" . $this->msg;

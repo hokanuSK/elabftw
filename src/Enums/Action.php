@@ -27,6 +27,8 @@ enum Action: string
     case Disable2fa = 'disable2fa';
     case Duplicate = 'duplicate';
     case Email = 'email';
+    case EmailBookers = 'emailbookers';
+    case EmailTeam = 'emailteam';
     case Finish = 'finish';
     case ForceLock = 'forcelock';
     case ForceUnlock = 'forceunlock';
@@ -40,8 +42,8 @@ enum Action: string
     case Restore = 'restore';
     case Review = 'review';
     case SendOnboardingEmails = 'sendonboardingemails';
-    case SetCanread = 'setcanread';
-    case SetCanwrite = 'setcanwrite';
+    case SetCanRead = 'setcanread';
+    case SetCanWrite = 'setcanwrite';
     case SetNextCustomId = 'setnextcustomid';
     case Sign = 'sign';
     case Test = 'test';

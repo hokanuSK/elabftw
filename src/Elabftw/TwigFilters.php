@@ -20,14 +20,19 @@ use Elabftw\Enums\Metadata as MetadataEnum;
 use Elabftw\Enums\Scope;
 use Elabftw\Exceptions\ResourceNotFoundException;
 use Elabftw\Models\Users\Users;
+use Exception;
 
 use function is_array;
 use function implode;
+use function hash;
 use function str_split;
 use function is_string;
 use function json_decode;
 use function sprintf;
 use function nl2br;
+use function _;
+use function array_key_exists;
+use function in_array;
 
 /**
  * Twig filters
@@ -44,12 +49,18 @@ final class TwigFilters
 
         $crossLink = '';
         if ($closable) {
-            $crossLink = "<a href='#' class='close' data-dismiss='alert'>&times;</a>";
+            // xxh3 is super fast and a good fit for this non-cryptographic use case
+            $crossLink = sprintf(
+                "<a href='#' class='close' data-dismiss='alert' data-action='save-dismiss' data-dismiss-key='%s'>&times;</a>",
+                hash('xxh3', $message),
+            );
         }
 
         // "status" role: see WCAG2.1 4.1.3
+        // we set it hidden to avoid a flash, js will make it visible or not depending on dismiss key value/presence
         return sprintf(
-            "<div role='status' class='alert alert-%s'><i class='fa-fw fas %s color-%s'></i>%s %s</div>",
+            "<div role='status' %s class='alert alert-%s'><i class='fa-fw fas %s color-%s'></i>%s %s</div>",
+            $closable ? 'hidden' : '',
             $level->toAlertClass(),
             $level->toFaIcon(),
             $level->toAlertClass(),
@@ -69,13 +80,17 @@ final class TwigFilters
      */
     public static function formatMetadata(string $json): string
     {
-        $final = '';
-        $Metadata = new Metadata($json);
-        $extraFields = $Metadata->getExtraFields();
+        try {
+            $Metadata = new Metadata($json);
+            $extraFields = $Metadata->getExtraFields();
+        } catch (Exception $e) {
+            return self::displayMessage($e->getMessage(), 'ko', false);
+        }
         if (empty($extraFields)) {
             return $Metadata->getRaw();
         }
 
+        $final = '';
         $grouped = $Metadata->getGroupedExtraFields();
 
         foreach ($grouped as $group) {

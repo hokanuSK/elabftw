@@ -21,6 +21,10 @@ use Elabftw\Models\Users\Users;
 use Elabftw\Traits\TestsUtilsTrait;
 use PDO;
 
+use function array_column;
+use function count;
+use function sprintf;
+
 class LinksTest extends \PHPUnit\Framework\TestCase
 {
     use TestsUtilsTrait;
@@ -165,16 +169,13 @@ class LinksTest extends \PHPUnit\Framework\TestCase
 
         // User 1 creates experiment A that is visible to the team
         $Experiments = $this->getFreshExperiment();
-        $ExperimentAId = $Experiments->create(
-            title: 'Experiment A',
-            canread: BasePermissions::Team->toJson(),
-        );
+        $ExperimentAId = $Experiments->create(title: 'Experiment A');
 
         // User 1 creates experiment B that is visible only to themself
         $secretTitle = 'Experiment B - This title shall not be visible to user 2 after importing links';
         $ExperimentBId = $Experiments->create(
             title: $secretTitle,
-            canread: BasePermissions::User->toJson(),
+            canreadBase: BasePermissions::User,
         );
 
         // Experiment A links to experiment B
@@ -184,10 +185,7 @@ class LinksTest extends \PHPUnit\Framework\TestCase
 
         // User 2 creates experiment C and adds a link to experiment A
         $Experiments = new Experiments(new Users(2, 1));
-        $ExperimentCId = $Experiments->create(
-            title: 'Experiment C',
-            canread: BasePermissions::Team->toJson(),
-        );
+        $ExperimentCId = $Experiments->create(title: 'Experiment C');
         $Experiments->setId($ExperimentCId);
         $Experiments->ExperimentsLinks->setId($ExperimentAId);
         $Experiments->ExperimentsLinks->postAction(Action::Create, array());
@@ -216,15 +214,12 @@ class LinksTest extends \PHPUnit\Framework\TestCase
         $Experiments = $this->getFreshExperiment();
         $ExperimentAId = $Experiments->create(
             title: 'Experiment A',
-            canread: BasePermissions::Organization->toJson(),
+            canreadBase: BasePermissions::Organization,
         );
 
         // User 1 creates experiment B that is visible to their team
         $secretTitle = 'Experiment B - This title shall not be visible to user 5 after importing links';
-        $ExperimentBId = $Experiments->create(
-            title: $secretTitle,
-            canread: BasePermissions::Team->toJson(),
-        );
+        $ExperimentBId = $Experiments->create(title: $secretTitle);
 
         // Experiment A links to experiment B
         $Experiments->setId($ExperimentAId);
@@ -235,7 +230,7 @@ class LinksTest extends \PHPUnit\Framework\TestCase
         $Experiments = new Experiments(new Users(5, 2));
         $ExperimentCId = $Experiments->create(
             title: 'Experiment C',
-            canread: BasePermissions::Organization->toJson(),
+            canreadBase: BasePermissions::Organization,
         );
         $Experiments->setId($ExperimentCId);
         $Experiments->ExperimentsLinks->setId($ExperimentAId);
@@ -286,17 +281,17 @@ class LinksTest extends \PHPUnit\Framework\TestCase
         // insert an ItemsType with the exact same ID as ItemB.
         // We must insert manually: create() cannot create entities with a preassigned ID.
         $User = $this->getRandomUserInTeam(1);
-        $defaultPermissions = BasePermissions::Team->toJson();
-        $req = $this->Db->prepare('INSERT INTO items_types (id, title, userid, team, canread, canwrite, canread_target, canwrite_target) VALUES (:id, :title, :userid, :team, :canread, :canwrite, :canread_target, :canwrite_target)');
+        $req = $this->Db->prepare('INSERT INTO items_types (id, title, userid, team, canread, canwrite, canbook, canread_target, canwrite_target) VALUES (:id, :title, :userid, :team, :canread, :canwrite, :canbook, :canread_target, :canwrite_target)');
         $req->bindValue(':id', $ItemB->id, PDO::PARAM_INT);
         $req->bindValue(':title', 'Template X');
         $req->bindValue(':userid', $User->userData['userid'], PDO::PARAM_INT);
         $req->bindValue(':team', $User->team, PDO::PARAM_INT);
-        $req->bindValue(':canread', $defaultPermissions);
-        $req->bindValue(':canwrite', $defaultPermissions);
-        $req->bindValue(':canread_target', $defaultPermissions);
-        $req->bindValue(':canwrite_target', $defaultPermissions);
-        $req->execute();
+        $req->bindValue(':canread', AbstractEntity::EMPTY_CAN_JSON);
+        $req->bindValue(':canwrite', AbstractEntity::EMPTY_CAN_JSON);
+        $req->bindValue(':canbook', AbstractEntity::EMPTY_CAN_JSON);
+        $req->bindValue(':canread_target', AbstractEntity::EMPTY_CAN_JSON);
+        $req->bindValue(':canwrite_target', AbstractEntity::EMPTY_CAN_JSON);
+        $this->Db->execute($req);
 
         $ItemsTypes = new ItemsTypes($User, $ItemB->id);
         $this->assertSame($ItemsTypes->id, $ItemB->id);

@@ -30,9 +30,9 @@ final class OnboardingEmail extends EmailOnlyNotifications implements MailableIn
     /**
      * @param int $teamId team id or -1 for onboarding email from system (sysadmin panel)
      */
-    public function __construct(private int $teamId, private bool $forAdmin = false)
+    public function __construct(Users $targetUser, private int $teamId, private bool $forAdmin = false)
     {
-        parent::__construct();
+        parent::__construct($targetUser);
     }
 
     #[Override]
@@ -47,7 +47,7 @@ final class OnboardingEmail extends EmailOnlyNotifications implements MailableIn
 
         if ($this->teamId > 0) {
             $Team = new Teams(new Users(), $this->teamId);
-            $dataArr = $Team->readOneComplete();
+            $dataArr = $Team->selectOne();
         } elseif ($this->teamId === -1) {
             $dataArr = Config::getConfig()->configArr;
         }

@@ -2,6 +2,17 @@ describe('Login page', () => {
   beforeEach(() => {
   });
 
+  it ('does not show Safari warning on non-Safari browsers', () => {
+    cy.visit('/login.php');
+    cy.get('#safariWarning').should('exist');
+    cy.get('#safariWarning').should('have.attr', 'hidden');
+  });
+
+  it ('does not show logout message on the first time', () => {
+    cy.visit('/login.php');
+    cy.get('#logoutMessage').should('exist').should('have.attr', 'hidden');
+  });
+
   it('sets auth cookie when logging in via form submission', () => {
     const email = 'toto@yopmail.com';
     const password = 'totototototo';
@@ -23,7 +34,7 @@ describe('Login page', () => {
     });
     cy.getCookie('devicetoken').should('exist');
     // UI should reflect this user being logged in
-    cy.get('h6.dropdown-header').should('contain', 'Toto');
+    cy.get('.dropdown-header').should('contain', 'Toto');
   });
 
   function fillEmailAddress(email: string): void {

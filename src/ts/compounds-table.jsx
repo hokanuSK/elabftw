@@ -24,6 +24,7 @@ import { notify } from './notify';
 if (document.getElementById('compounds-table')) {
   ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
+  const isDark = document.documentElement.classList.contains('dark-mode');
   const rowSelection = {
       mode: 'multiRow',
       headerCheckbox: false,
@@ -171,10 +172,7 @@ if (document.getElementById('compounds-table')) {
           onChange={onQuickFilterChange}
           className={'form-control mb-2'}
         />
-      <div
-        className={'ag-theme-alpine'}
-        style={{ height: 650 }}
-      >
+        <div className={isDark ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'} style={{ height: 650 }}>
         <AgGridReact
           rowData={rowData}
           columnDefs={columnDefs}
@@ -190,7 +188,7 @@ if (document.getElementById('compounds-table')) {
         <div className='d-flex justify-content-end my-2'>
           <button
             type='button'
-            className={`btn btn-sm ${showDeleted ? 'bgnd-gray' : 'btn-ghost'}`}
+            className={'btn btn-sm btn-ghost'}
             onClick={() => setShowDeleted(!showDeleted)}
           >
             {showDeleted ? i18next.t('hide-deleted') : i18next.t('show-deleted')}

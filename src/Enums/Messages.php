@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Elabftw\Enums;
 
+use function _;
+
 enum Messages
 {
     case CriticalError;
@@ -19,6 +21,7 @@ enum Messages
     case GenericError;
     case UnauthorizedError;
     case InsufficientPermissions;
+    case ResourceNotFound;
 
     public function toHttpCode(): int
     {
@@ -28,6 +31,7 @@ enum Messages
             $this::GenericError => 400,
             $this::UnauthorizedError => 401,
             $this::InsufficientPermissions => 403,
+            $this::ResourceNotFound => 404,
         };
     }
 
@@ -39,6 +43,7 @@ enum Messages
             $this::GenericError => _('An error occurred!'),
             $this::UnauthorizedError => _('Authentication required'),
             $this::InsufficientPermissions => _('Sorry, you are not allowed to perform that action.'),
+            $this::ResourceNotFound => _('Nothing to show with this id'),
         };
     }
 }

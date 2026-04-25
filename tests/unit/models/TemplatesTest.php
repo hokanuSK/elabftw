@@ -12,11 +12,12 @@ declare(strict_types=1);
 namespace Elabftw\Models;
 
 use Elabftw\Enums\Action;
-use Elabftw\Enums\BasePermissions;
 use Elabftw\Enums\EntityType;
 use Elabftw\Enums\State;
 use Elabftw\Models\Users\Users;
 use Elabftw\Params\DisplayParams;
+
+use function json_decode;
 
 class TemplatesTest extends \PHPUnit\Framework\TestCase
 {
@@ -68,7 +69,7 @@ class TemplatesTest extends \PHPUnit\Framework\TestCase
         $this->Templates->patch(Action::Update, array('canread_is_immutable' => 1));
         $this->assertEquals(1, $this->Templates->readOne()['canread_is_immutable']);
         // patch read permissions for this template
-        $canread = BasePermissions::Organization->toJson();
+        $canread = AbstractEntity::EMPTY_CAN_JSON;
         $this->Templates->patch(Action::Update, array('canread' => $canread));
         $this->assertEquals(
             json_decode($canread),

@@ -1,4 +1,25 @@
-# because we build ci images here
+apidoc
 cache
+CHANGELOG.md
+CITATION.cff
+codemeta.json
+containers/elabimg/docker-compose-EXAMPLE.yml
+containers/chem-plugin/fingerprinter/.venv
+containers/chem-plugin/fingerprinter/__pycache__
+containers/chem-plugin/indigo/.venv
+containers/chem-plugin/indigo/__pycache__
+CONTRIBUTING.md
 exports
+FUNDING.yml
+GOVERNANCE.md
+ideas
+LICENSE
+paper.bib
+paper.md
+README.md
+SECURITY.md
+sonar-project.properties
+todo
+TRADEMARK.md
 uploads
+vendor

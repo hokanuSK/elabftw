@@ -18,22 +18,40 @@ use Elabftw\Elabftw\Tools;
 use Elabftw\Enums\EntityType;
 use Elabftw\Enums\Metadata;
 use Elabftw\Enums\State;
+use Elabftw\Enums\Storage;
 use Elabftw\Exceptions\IllegalActionException;
-use Elabftw\Interfaces\StorageInterface;
 use Elabftw\Models\AbstractEntity;
 use Elabftw\Models\Experiments;
 use Elabftw\Models\Items;
 use Elabftw\Models\Users\Users;
 use Elabftw\Params\BaseQueryParams;
 use Elabftw\Traits\TwigTrait;
-use League\Flysystem\Filesystem;
 use League\Flysystem\UnableToReadFile;
 use ZipStream\ZipStream;
 use Override;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 use function array_push;
 use function ksort;
+use function array_column;
+use function array_key_exists;
+use function array_key_first;
+use function array_merge;
+use function array_reduce;
+use function date;
+use function explode;
+use function fclose;
+use function fopen;
+use function hash;
+use function hash_file;
+use function implode;
+use function in_array;
+use function json_decode;
+use function json_encode;
+use function random_bytes;
+use function sprintf;
+use function strtr;
 
 /**
  * Make an ELN archive
@@ -42,12 +60,9 @@ class MakeEln extends AbstractMakeEln
 {
     use TwigTrait;
 
-    private Filesystem $fs;
-
-    public function __construct(protected ZipStream $Zip, protected Users $requester, StorageInterface $storage, protected array $entityArr)
+    public function __construct(protected LoggerInterface $logger, ZipStream $Zip, protected Users $requester, protected array $entityArr)
     {
         parent::__construct($Zip);
-        $this->fs = $storage->getFs();
     }
 
     /**
@@ -195,7 +210,8 @@ class MakeEln extends AbstractMakeEln
             try {
                 // this gets modified by the function so we have the correct real_names
                 $uploadedFilesArr = $this->addAttachedFiles($uploadedFilesArr);
-            } catch (UnableToReadFile) {
+            } catch (UnableToReadFile $ex) {
+                $this->logger->error($ex->getMessage());
             }
             foreach ($uploadedFilesArr as $file) {
                 $uploadAtId = './' . $currentDatasetFolder . $file['uuid'];
@@ -308,13 +324,14 @@ class MakeEln extends AbstractMakeEln
     protected function addAttachedFiles($filesArr): array
     {
         foreach ($filesArr as &$file) {
+            $storageFs = Storage::from($file['storage'])->getStorage()->getFs();
             // make sure we have a hash
             if (empty($file['hash'])) {
-                $file['hash'] = hash($this->hashAlgorithm, $this->fs->read($file['long_name']));
+                $file['hash'] = hash($this->hashAlgorithm, $storageFs->read($file['long_name']));
             }
             // add files to archive
             $file['uuid'] = Tools::getUuidv4();
-            $this->addAttachedFileInZip($this->folder . '/' . $file['uuid'], $this->fs->readStream($file['long_name']));
+            $this->addAttachedFileInZip($this->folder . $file['uuid'], $storageFs->readStream($file['long_name']));
         }
         return $filesArr;
     }

@@ -33,6 +33,17 @@ use Override;
 use PDO;
 use Symfony\Component\HttpFoundation\InputBag;
 
+use function _;
+use function array_flip;
+use function array_intersect_key;
+use function array_keys;
+use function array_map;
+use function array_sum;
+use function implode;
+use function rtrim;
+use function sprintf;
+use function str_contains;
+
 /**
  * Compounds are chemical entities stored in the `compounds` SQL table
  */
@@ -522,7 +533,8 @@ final class Compounds extends AbstractRest
         if (!empty($reqBody['cid'])) {
             return $this->createFromCompound($this->searchPubChem((int) $reqBody['cid']));
         }
-        return $this->createFromCompound($this->searchPubChemCas($reqBody['cas'])[0]);
+        $cas = $reqBody['cas'] ?? throw new ImproperActionException('Missing pubchem_cid or cas_number');
+        return $this->createFromCompound($this->searchPubChemCas($cas)[0]);
     }
 
     private function getSelectBeforeWhere(): string
@@ -584,7 +596,7 @@ final class Compounds extends AbstractRest
         $req = $this->Db->prepare($sql);
         $req->bindValue(':state_normal', State::Normal->value, PDO::PARAM_INT);
         $req->bindValue(':state_archived', State::Archived->value, PDO::PARAM_INT);
-        $req->execute();
+        $this->Db->execute($req);
         return $req->fetchAll();
     }
 

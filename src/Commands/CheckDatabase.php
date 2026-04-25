@@ -12,12 +12,14 @@ declare(strict_types=1);
 
 namespace Elabftw\Commands;
 
-use Elabftw\Elabftw\Update;
+use Elabftw\Elabftw\SchemaVersionChecker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Override;
+
+use function sprintf;
 
 /**
  * Check the the current schema version versus the required one
@@ -49,9 +51,9 @@ final class CheckDatabase extends Command
             'Database check',
             '==============',
             sprintf('Current version: %d', $this->currentSchema),
-            sprintf('Required version: %d', Update::REQUIRED_SCHEMA),
+            sprintf('Required version: %d', SchemaVersionChecker::REQUIRED_SCHEMA),
         ));
-        if ($this->currentSchema === Update::REQUIRED_SCHEMA) {
+        if ($this->currentSchema === SchemaVersionChecker::REQUIRED_SCHEMA) {
             $output->writeln('No upgrade required.');
             return Command::SUCCESS;
         }

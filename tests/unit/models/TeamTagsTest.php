@@ -14,7 +14,10 @@ namespace Elabftw\Models;
 use Elabftw\Enums\Action;
 use Elabftw\Exceptions\IllegalActionException;
 use Elabftw\Models\Users\Users;
+use Elabftw\Params\TagParam;
 use Elabftw\Traits\TestsUtilsTrait;
+
+use function count;
 
 class TeamTagsTest extends \PHPUnit\Framework\TestCase
 {
@@ -76,6 +79,19 @@ class TeamTagsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($beforeCnt - 1, $afterCnt);
     }
 
+    public function testDeduplicateCaseSensitive(): void
+    {
+        $id = $this->Tags->postAction(Action::Create, array('tag' => 'CAPITAL'));
+        $this->TeamTags->setId($id);
+        $beforeCnt = count($this->TeamTags->readAll());
+        $this->TeamTags->patch(Action::UpdateTag, array('tag' => 'capital'));
+        $afterCnt = count($this->TeamTags->readAll());
+        // at the end, we have the same number of tags because both have been merged
+        $this->assertEquals($beforeCnt, $afterCnt);
+        $tag = $this->TeamTags->readOne();
+        $this->assertEquals('capital', $tag['tag']);
+    }
+
     public function testUpdateTag(): void
     {
         $id = $this->Tags->postAction(Action::Create, array('tag' => 'sometag!!'));
@@ -88,5 +104,17 @@ class TeamTagsTest extends \PHPUnit\Framework\TestCase
     public function testDestroy(): void
     {
         $this->assertTrue($this->TeamTags->destroy());
+    }
+
+    public function testDestroyTagFromOtherTeam(): void
+    {
+        $tag = 'cross team test';
+        // create the tag in team 1
+        $id = $this->TeamTags->create(new TagParam($tag));
+        $this->TeamTags->setId($id);
+        // now we try and delete it from team 2
+        new TeamTags($this->getUserInTeam(2, 1), $id)->destroy();
+        // tag has not been destroyed: we can still read it
+        $this->assertSame($tag, $this->TeamTags->readOne()['tag']);
     }
 }

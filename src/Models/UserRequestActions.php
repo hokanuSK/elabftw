@@ -20,6 +20,10 @@ use Elabftw\Models\Users\Users;
 use Override;
 use PDO;
 
+use function array_map;
+use function implode;
+use function sprintf;
+
 /**
  * Request action for users
  */
@@ -62,7 +66,7 @@ final class UserRequestActions extends AbstractRest
         $req = $this->Db->prepare($sql);
         $req->bindParam(':userid', $this->requester->userData['userid'], PDO::PARAM_INT);
         $req->bindValue(':state', State::Normal->value, PDO::PARAM_INT);
-        $req->execute();
+        $this->Db->execute($req);
         return $req->fetchAll();
     }
 

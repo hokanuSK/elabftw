@@ -13,12 +13,15 @@ namespace Elabftw\Make;
 
 use Elabftw\Elabftw\CreateUploadFromLocalFile;
 use Elabftw\Enums\Action;
+use Elabftw\Enums\AccessType;
 use Elabftw\Models\Experiments;
 use Elabftw\Models\Users\Users;
 use Elabftw\Services\MpdfProvider;
 use Elabftw\Traits\TestsUtilsTrait;
 use Monolog\Handler\NullHandler;
 use Monolog\Logger;
+
+use function dirname;
 
 class MakePdfTest extends \PHPUnit\Framework\TestCase
 {
@@ -34,7 +37,7 @@ class MakePdfTest extends \PHPUnit\Framework\TestCase
         $Entity = new Experiments(new Users(1, 1), null);
         $new = $Entity->create();
         $Entity->setId($new);
-        $Entity->canOrExplode('write');
+        $Entity->canOrExplode(AccessType::Write);
         $entityData = $Entity->readOne();
         $body = $entityData['body_html'];
         // add invalid tex macro to body to cover notification being created upon failing mathjax

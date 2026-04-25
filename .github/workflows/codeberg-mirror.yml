@@ -1,0 +1,44 @@
+name: Selective mirror to Codeberg
+
+on:
+  push:
+    branches:
+      - master
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history (required for tags + full refs)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Start SSH agent and add key
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.CODEBERG_SSH_KEY }}
+
+      - name: Add Codeberg to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H codeberg.org >> ~/.ssh/known_hosts
+
+      - name: Add Codeberg remote (SSH)
+        run: |
+          git remote remove codeberg 2>/dev/null || true
+          git remote add codeberg git@codeberg.org:deltablot/elabftw.git
+
+      - name: Fetch triggering branch + tags
+        run: |
+          git fetch origin "${GITHUB_REF_NAME}" --tags --prune
+
+      - name: Push triggering branch to Codeberg (force update)
+        run: |
+          git push --force codeberg \
+            "refs/remotes/origin/${GITHUB_REF_NAME}:refs/heads/${GITHUB_REF_NAME}"
+
+      - name: Push tags to Codeberg
+        run: |
+          git push --force --tags codeberg

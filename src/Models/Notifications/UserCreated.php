@@ -17,15 +17,18 @@ use Elabftw\Interfaces\MailableInterface;
 use Elabftw\Models\Users\Users;
 use Override;
 
+use function _;
+use function sprintf;
+
 class UserCreated extends AbstractNotifications implements MailableInterface
 {
     protected const PREF = 'notif_user_created';
 
     protected Notifications $category = Notifications::UserCreated;
 
-    public function __construct(private int $userid, private string $team)
+    public function __construct(Users $targetUser, private int $userid, private string $team)
     {
-        parent::__construct();
+        parent::__construct($targetUser);
     }
 
     #[Override]

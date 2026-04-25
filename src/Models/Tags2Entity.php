@@ -18,6 +18,12 @@ use Elabftw\Enums\Scope;
 use Elabftw\Models\Users\Users;
 use PDO;
 
+use function array_keys;
+use function array_map;
+use function count;
+use function implode;
+use function sprintf;
+
 final class Tags2Entity
 {
     private Db $Db;
@@ -47,7 +53,7 @@ final class Tags2Entity
         }
         $req->bindValue(':type', $this->entityType->value);
         $req->bindValue(':count', count($tags), PDO::PARAM_INT);
-        $req->execute();
+        $this->Db->execute($req);
         return $req->fetchAll(PDO::FETCH_COLUMN);
     }
 

@@ -14,6 +14,8 @@ namespace Elabftw\Enums;
 
 use InvalidArgumentException;
 
+use function _;
+
 enum BasePermissions: int
 {
     case Full = 50;
@@ -79,10 +81,5 @@ enum BasePermissions: int
             }
         }
         return $base;
-    }
-
-    public function toJson(): string
-    {
-        return sprintf('{"base": %d, "teams": [], "teamgroups": [], "users": []}', $this->value);
     }
 }

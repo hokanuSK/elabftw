@@ -111,6 +111,32 @@ class TwigFiltersTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expected, TwigFilters::formatMetadata($metadataJson));
     }
 
+    public function testFormatMetadataFailed(): void
+    {
+        $metadataJsonFailed = '{
+        "extra_fields": {
+          "XXXXXXXXXXX": {
+            "type": "text",
+            "value": "",
+            "group_id": 1,
+            "position": 4,
+            "required": true
+          },
+          "YYYYYYYYY": "",
+          "XXXXXXXXXX": {
+           "type": "date",
+           "value": "",
+           "group_id": 1,
+           "position": 3,
+           "required": true
+          }
+         }
+        }';
+        $result = TwigFilters::formatMetadata($metadataJsonFailed);
+        $this->assertIsString($result);
+        $this->assertStringContainsString('Invalid custom field', $result);
+    }
+
     public function testFormatMetadataEmptyExtrafields(): void
     {
         $metadata = '{"hello": "friend"}';
@@ -126,5 +152,17 @@ class TwigFiltersTest extends \PHPUnit\Framework\TestCase
     {
         $json = '[]';
         $this->assertEquals(array(), TwigFilters::jsonDecode($json));
+    }
+
+    public function testAnyToString(): void
+    {
+        $this->assertSame('1', TwigFilters::any2string('1'));
+        $this->assertSame('', TwigFilters::any2string(null));
+    }
+
+    public function testFormatMfaSecret(): void
+    {
+        $formatted = '44HN HIFE CEJC IBZO V4TR JZGM XVYM OYG6';
+        $this->assertSame($formatted, TwigFilters::formatMfaSecret('44HNHIFECEJCIBZOV4TRJZGMXVYMOYG6'));
     }
 }

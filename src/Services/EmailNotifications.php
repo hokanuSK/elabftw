@@ -29,6 +29,8 @@ use function dirname;
 use function putenv;
 use function setlocale;
 use function textdomain;
+use function array_key_exists;
+use function sprintf;
 
 /**
  * Email notification system
@@ -53,7 +55,7 @@ class EmailNotifications
                 $targetUser = new Users($notif['userid']);
                 $this->setLang($targetUser->userData['lang']);
                 $to = new Address($targetUser->userData['email'], $targetUser->userData['fullname']);
-                $Factory = new NotificationsFactory($notif['category'], $notif['body']);
+                $Factory = new NotificationsFactory($targetUser, $notif['category'], $notif['body']);
                 $email = $Factory->getMailable()->getEmail();
                 $cc = array_key_exists('cc', $email) ? $email['cc'] : null;
                 $htmlBody = array_key_exists('htmlBody', $email) ? (string) $email['htmlBody'] : null;

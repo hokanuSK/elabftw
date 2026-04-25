@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Elabftw\Import;
 
-use Elabftw\Enums\BasePermissions;
 use Elabftw\Enums\EntityType;
 use Elabftw\Exceptions\ImproperActionException;
 use Elabftw\Models\Users\Users;
@@ -52,8 +51,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
         $this->expectException(ImproperActionException::class);
         new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -74,8 +71,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
         $this->expectException(ImproperActionException::class);
         new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -96,8 +91,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -120,8 +113,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -141,8 +132,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -164,8 +153,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -173,6 +160,28 @@ class ElnTest extends \PHPUnit\Framework\TestCase
         );
         $Import->import();
         $this->assertEquals(1, $Import->getInserted());
+    }
+
+    public function testImportV106(): void
+    {
+        $uploadedFile = new UploadedFile(
+            dirname(__DIR__, 2) . '/_data/version-106.eln',
+            'importable.eln',
+            null,
+            UPLOAD_ERR_OK,
+            true,
+        );
+
+        $Import = new Eln(
+            new Users(1, 1),
+            $uploadedFile,
+            $this->fs,
+            $this->logger,
+            EntityType::Experiments,
+        );
+        $Import->import();
+        // it contains a linked resource
+        $this->assertEquals(2, $Import->getInserted());
     }
 
     public function testImportTrusted(): void
@@ -187,8 +196,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new TrustedEln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -211,8 +218,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -235,8 +240,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -260,8 +263,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
         $this->expectException(ImproperActionException::class);
         new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -282,8 +283,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -305,8 +304,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -329,8 +326,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,
@@ -353,8 +348,6 @@ class ElnTest extends \PHPUnit\Framework\TestCase
 
         $Import = new Eln(
             new Users(1, 1),
-            BasePermissions::Team->toJson(),
-            BasePermissions::User->toJson(),
             $uploadedFile,
             $this->fs,
             $this->logger,

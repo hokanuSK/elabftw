@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Elabftw\Elabftw;
 
+use function in_array;
+
 /**
  * Define extensions groups
  */
@@ -57,6 +59,7 @@ final class Extensions
         'gif',
         'heic',
         'jpeg',
+        'bmp',
         'jpg',
         'png',
         'tif',

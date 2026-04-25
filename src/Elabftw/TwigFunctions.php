@@ -23,6 +23,11 @@ use Symfony\Component\HttpFoundation\Request;
 use function memory_get_usage;
 use function microtime;
 use function round;
+use function array_rand;
+use function array_splice;
+use function count;
+use function in_array;
+use function json_decode;
 
 /**
  * Functions used by Twig in templates
@@ -97,19 +102,10 @@ final class TwigFunctions
         return (new DateTime())->modify($input)->format('Y-m-d H:i:s');
     }
 
-    public static function extractJson(string $json, string $key): bool|int
-    {
-        $decoded = json_decode($json, true, 3, JSON_THROW_ON_ERROR);
-        if (isset($decoded[$key])) {
-            return (int) $decoded[$key];
-        }
-        return false;
-    }
-
     public static function isInJsonArray(string $json, string $key, int $target): bool
     {
         $decoded = json_decode($json, true, 3, JSON_THROW_ON_ERROR);
-        if (in_array($target, $decoded[$key], true)) {
+        if (in_array($target, $decoded[$key] ?? array(), true)) {
             return true;
         }
         return false;

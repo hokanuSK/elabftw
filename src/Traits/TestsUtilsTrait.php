@@ -23,6 +23,8 @@ use Elabftw\Models\Templates;
 use Elabftw\Models\Users\Users;
 use PDO;
 
+use function array_rand;
+
 trait TestsUtilsTrait
 {
     protected function getUserInTeam(int $team, int $admin = 0, int $archived = 0): AuthenticatedUser
@@ -100,7 +102,11 @@ trait TestsUtilsTrait
         $Item = $this->getFreshItem($team);
         $ResourcesCategories = new ResourcesCategories(new Teams($Item->Users, $team));
         $category = (string) $ResourcesCategories->readAll()[0]['id'];
-        $Item->patch(Action::Update, array('is_bookable' => '1', 'category' => $category));
+        $Item->patch(Action::Update, array(
+            'is_bookable' => '1',
+            'booking_hourly_rate_notax' => 10.00,
+            'category' => $category,
+        ));
         return $Item;
     }
 
@@ -118,5 +124,15 @@ trait TestsUtilsTrait
         $id = $Entity->create();
         $Entity->setId($id);
         return $Entity;
+    }
+
+    protected function updateArchiveStatus(int $userid, int $is_archived): void
+    {
+        $Db = Db::getConnection();
+        $sql = 'UPDATE users2teams SET is_archived = :is_archived WHERE users_id = :userid';
+        $req = $Db->prepare($sql);
+        $req->bindParam(':userid', $userid, PDO::PARAM_INT);
+        $req->bindValue(':is_archived', $is_archived, PDO::PARAM_INT);
+        $Db->execute($req);
     }
 }

@@ -483,6 +483,7 @@ export function initMetadataUi(initEntity: Entity, options: MetadataUiOptions = 
         const newGroup = document.createElement('div');
         newGroup.classList.add('input-group', 'mb-1');
         const newInput = document.createElement('input');
+        newInput.setAttribute('aria-labelledby', 'choicesInputLabel');
         // the is-extra-input class is used to remove them upon save
         newInput.classList.add('form-control', 'is-extra-input');
         const appendDiv = document.createElement('div');

@@ -9,7 +9,7 @@
 @use './variables';
 
 .navbar {
-  background-color: variables.$mediumstrong;
+  background-color: var(--chrome-bg);
   border: 0;
   border-radius: 0;
   margin-bottom: 10px;
@@ -21,7 +21,9 @@
 }
 
 .nav-link {
-  color: variables.$secondlevel;
+  border: 1px solid transparent;
+  border-bottom: 6px;
+  color: var(--secondlevel);
   font-size: 90%;
   line-height: 40px;
   margin-left: 15px;
@@ -30,31 +32,47 @@
   min-height: 43px;
   /* we want the border bottom to be same width as the text
        and the text centered on the bar */
-  padding: 0 !important;
+  padding: 0 5px !important;
   text-align: center;
   text-decoration: none;
   text-transform: uppercase;
 
-  /* blue on hover */
   &:hover {
-    color: variables.$elabblue !important;
-    transition-duration: 500ms;
+    border-color: $mainbackground !important;
+    color: $mainbackground !important;
   }
 
   /* selected nav entry */
   &.active {
-    background-image: linear-gradient(to top, variables.$elabblue 0%, variables.$elabblue 100%);
+    background-image: linear-gradient(to top, $mainbackground 0%, $mainbackground 100%);
     background-position: center bottom;
     background-repeat: no-repeat;
     background-size: 100% 6px;
+    border-color: $mainbackground !important;
   }
 
   i {
-    color: variables.$secondlevel;
+    color: var(--secondlevel);
   }
 }
 
 /* make the notification dropdown larger so english version fits in one line */
 #navbar-notif-dropdown {
   min-width: 15vw;
+}
+
+#navbarNotifDropdown {
+  position: relative;
+}
+
+#navbarNotifDropdown.notif-active::after {
+  background-color: var(--red);
+  border: 2px solid var(--chrome-fg);
+  border-radius: 50%;
+  content: '';
+  height: 10px;
+  position: absolute;
+  right: 3px;
+  top: 8px;
+  width: 10px;
 }

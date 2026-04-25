@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Elabftw\Models;
 
 use Elabftw\Enums\Action;
-use Elabftw\Enums\BasePermissions;
 use Elabftw\Enums\Scope;
 use Elabftw\Enums\Usergroup;
 use Elabftw\Enums\Users2TeamsTargets;
@@ -22,6 +21,9 @@ use Elabftw\Exceptions\ResourceNotFoundException;
 use Elabftw\Models\Users\Users;
 use Elabftw\Params\UserParams;
 use Elabftw\Traits\TestsUtilsTrait;
+
+use function count;
+use function is_array;
 
 class UsersTest extends \PHPUnit\Framework\TestCase
 {
@@ -131,8 +133,9 @@ class UsersTest extends \PHPUnit\Framework\TestCase
             'scope_experiments' => Scope::Everything->value,
             'lang' => 'en_GB',
             'pdf_format' => 'A4',
-            'default_read' => BasePermissions::Organization->toJson(),
+            'default_read' => AbstractEntity::EMPTY_CAN_JSON,
             'display_mode' => 'it',
+            'theme_variant' => 1,
             'sort' => 'date',
             'orderby' => 'desc',
         );

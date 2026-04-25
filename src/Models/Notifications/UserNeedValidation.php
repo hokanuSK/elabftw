@@ -18,15 +18,18 @@ use Elabftw\Interfaces\MailableInterface;
 use Elabftw\Models\Users\Users;
 use Override;
 
+use function _;
+use function sprintf;
+
 final class UserNeedValidation extends UserCreated implements MailableInterface
 {
     protected const PREF = 'notif_user_need_validation';
 
     protected Notifications $category = Notifications::UserNeedValidation;
 
-    public function __construct(private int $userid, private string $team)
+    public function __construct(Users $targetUser, private int $userid, private string $team)
     {
-        parent::__construct($this->userid, $this->team);
+        parent::__construct($targetUser, $this->userid, $this->team);
     }
 
     #[Override]

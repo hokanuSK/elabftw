@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 namespace Elabftw\Commands;
 
-use Elabftw\Enums\BasePermissions;
 use Elabftw\Enums\EntityType;
 use Elabftw\Import\TrustedEln;
 use Elabftw\Interfaces\StorageInterface;
@@ -30,6 +29,10 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Override;
+
+use function array_map;
+use function implode;
+use function sprintf;
 
 /**
  * Import an ELN archive
@@ -83,8 +86,6 @@ final class ImportEln extends Command
         }
         $Importer = new TrustedEln(
             $user,
-            BasePermissions::Team->toJson(),
-            BasePermissions::Team->toJson(),
             $UploadedFile,
             $this->Fs->getFs(),
             $logger,

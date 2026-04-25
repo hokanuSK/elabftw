@@ -62,6 +62,7 @@ import '../js/tinymce-langs/sk_SK.js';
 import '../js/tinymce-langs/sl_SI.js';
 import '../js/tinymce-langs/uz_UZ.js';
 import '../js/tinymce-langs/zh_CN.js';
+import '../js/tinymce-langs/zh_TW.js';
 import '../js/tinymce-plugins/mention/plugin.js';
 import { EntityType, Model } from './interfaces';
 import { reloadElements, escapeExtendedQuery, updateEntityBody, getNewIdFromPostRequest } from './misc';
@@ -209,6 +210,11 @@ export function getTinymceBaseConfig(page: string): object {
     removedMenuItems = 'newdocument, anchor';
   }
 
+  const isDark = document.documentElement.classList.contains('dark-mode');
+  const templateEndpoint = (entity.type === EntityType.Experiment || entity.type === EntityType.Template)
+    ? EntityType.Template
+    : EntityType.ItemType;
+
   return {
     selector: '.mceditable',
     table_default_styles: {
@@ -218,8 +224,9 @@ export function getTinymceBaseConfig(page: string): object {
     table_column_resizing: 'resizetable',
     browser_spellcheck: true,
     // location of the skin directory
-    skin_url: '/assets/tinymce_skins',
-    content_css: '/assets/tinymce_content.min.css',
+    skin_url: isDark ? '/assets/tinymce_skins_dark' : '/assets/tinymce_skins',
+    skin: isDark ? 'oxide-dark' : 'oxide',
+    content_css: isDark ? ['/assets/tinymce_skins/content/dark/content.min.css', '/assets/tinymce_content.min.css'] : ['/assets/tinymce_content.min.css'],
     emoticons_database_url: 'assets/tinymce_emojis.js',
     // remove the "Upgrade" button
     promotion: false,
@@ -242,7 +249,7 @@ export function getTinymceBaseConfig(page: string): object {
     // use undocumented callback function to asynchronously get the templates
     // see https://github.com/tinymce/tinymce/issues/5637#issuecomment-624982699
     templates: (callback): void => {
-      ApiC.getJson(`${EntityType.Template}`).then(json => {
+      ApiC.getJson(templateEndpoint).then(json => {
         const res = [];
         json.forEach(tpl => {
           res.push({'title': tpl.title, 'description': '', 'content': tpl.body});
@@ -312,14 +319,9 @@ export function getTinymceBaseConfig(page: string): object {
         });
       },
       insert: function(selected): string {
-        if (selected.type === 'items') {
-          ApiC.post(`${entity.type}/${entity.id}/items_links/${selected.id}`)
-            .then(() => reloadElements(['linksDiv']));
-        }
-        if (selected.type === 'experiments' && (entity.type === EntityType.Experiment || entity.type === EntityType.Item)) {
-          ApiC.post(`${entity.type}/${entity.id}/experiments_links/${selected.id}`)
-            .then(() => reloadElements(['linksExpDiv']));
-        }
+        const endpoint = selected.type === 'items' ? 'items_links' : 'experiments_links';
+        ApiC.post(`${entity.type}/${entity.id}/${endpoint}/${selected.id}`)
+          .then(() => reloadElements(['linksDiv']));
         const category = selected.category_title ? `${selected.category_title} - `: '';
         return `<span><a href='${selected.page}?mode=view&id=${selected.id}'>${category}${selected.title}</a></span>`;
       },
@@ -441,7 +443,7 @@ export function getTinymceBaseConfig(page: string): object {
       }
 
       // sort down icon from COLLECTION: Dazzle Line Icons LICENSE: CC Attribution License AUTHOR: Dazzle UI
-      editor.ui.registry.addIcon('sort-amount-down-alt', '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 12h8m-8-4h8m-8 8h8M6 7v10m0 0-3-3m3 3 3-3" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'), // eslint-disable-line
+      editor.ui.registry.addIcon('sort-amount-down-alt', '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 12h8m-8-4h8m-8 8h8M6 7v10m0 0-3-3m3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'), // eslint-disable-line
       // add toggle button for table sorting
       editor.ui.registry.addToggleButton('sort-table', {
         icon: 'sort-amount-down-alt',

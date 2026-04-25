@@ -21,6 +21,10 @@ use Exception;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 
+use function _;
+use function setcookie;
+use function time;
+
 /**
  * Login page
  */
@@ -56,6 +60,7 @@ try {
             $MfaHelper = new MfaHelper();
             $mfaQRCodeImageDataUri = $MfaHelper->getQRCodeImageAsDataUri($halfLoggedInUser->userData['email']);
             $mfaNewSecret = $MfaHelper->secret;
+            $App->Session->set('mfa_secret', $mfaNewSecret);
         }
 
         $Response->setContent($App->render('mfa.html', array(
@@ -70,6 +75,15 @@ try {
     }
 
     if ($App->Request->query->get('switch_team') === '1') {
+        $cookieOptions = array(
+            'expires' => time() - 3600,
+            'path' => '/',
+            'domain' => '',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        );
+        setcookie('token_team', '', $cookieOptions);
         $loggedInUser = new Users($App->Session->get('userid'));
         $App->Session->set('team_selection_required', true);
         $App->Session->set('team_selection', $loggedInUser->userData['teams']);

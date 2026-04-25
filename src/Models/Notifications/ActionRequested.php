@@ -20,15 +20,18 @@ use Elabftw\Models\AbstractEntity;
 use Elabftw\Models\Users\Users;
 use Override;
 
+use function _;
+use function sprintf;
+
 final class ActionRequested extends AbstractNotifications implements MailableInterface
 {
     protected const PREF = 'notif_action_requested';
 
     protected Notifications $category = Notifications::ActionRequested;
 
-    public function __construct(private Users $requester, private RequestableAction $action, private AbstractEntity $entity)
+    public function __construct(Users $targetUser, private Users $requester, private RequestableAction $action, private AbstractEntity $entity)
     {
-        parent::__construct();
+        parent::__construct($targetUser);
     }
 
     #[Override]

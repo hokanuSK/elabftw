@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Elabftw\Models;
 
 use Elabftw\Enums\Action;
+use Elabftw\Enums\AccessType;
 use Elabftw\Exceptions\ImproperActionException;
 use Elabftw\Interfaces\QueryParamsInterface;
 use Elabftw\Models\Notifications\StepDeadline;
@@ -26,6 +27,12 @@ use PDO;
 
 use function array_intersect;
 use function array_keys;
+use function _;
+use function array_key_exists;
+use function count;
+use function in_array;
+use function sprintf;
+use function str_replace;
 
 /**
  * All about the steps
@@ -55,7 +62,7 @@ final class Steps extends AbstractRest
      */
     public function import(array $step): void
     {
-        $this->Entity->canOrExplode('write');
+        $this->Entity->canOrExplode(AccessType::Write);
 
         $body = str_replace('|', ' ', $step['body']);
         $sql = 'INSERT INTO ' . $this->Entity->entityType->value . '_steps (item_id, body, ordering, finished, finished_time)
@@ -163,7 +170,7 @@ final class Steps extends AbstractRest
     #[Override]
     public function patch(Action $action, array $params): array
     {
-        $this->Entity->canOrExplode('write');
+        $this->Entity->canOrExplode(AccessType::Write);
         $this->Entity->touch();
         match ($action) {
             Action::Finish => $this->toggleFinished(),
@@ -203,7 +210,7 @@ final class Steps extends AbstractRest
     #[Override]
     public function postAction(Action $action, array $reqBody): int
     {
-        $this->Entity->canOrExplode('write');
+        $this->Entity->canOrExplode(AccessType::Write);
         $this->Entity->touch();
         $Changelog = new Changelog($this->Entity);
         $Changelog->create(new ContentParams('steps', $action->value));
@@ -213,7 +220,7 @@ final class Steps extends AbstractRest
     #[Override]
     public function destroy(): bool
     {
-        $this->Entity->canOrExplode('write');
+        $this->Entity->canOrExplode(AccessType::Write);
         $this->Entity->touch();
         $Changelog = new Changelog($this->Entity);
         /** @psalm-suppress PossiblyNullArgument */
@@ -298,8 +305,7 @@ final class Steps extends AbstractRest
 
     private function toggleNotif(): bool
     {
-        $this->getStepDeadline($this->readOne()['deadline'])
-            ->create($this->Entity->Users->userData['userid']);
+        $this->getStepDeadline($this->readOne()['deadline'])->create();
 
         return $this->setDeadlineNotif('!deadline_notif');
     }
@@ -331,6 +337,7 @@ final class Steps extends AbstractRest
     {
         /** @psalm-suppress PossiblyNullArgument */
         return new StepDeadline(
+            $this->Entity->Users,
             $this->id,
             $this->Entity->id,
             $this->Entity->entityType->toPage(),

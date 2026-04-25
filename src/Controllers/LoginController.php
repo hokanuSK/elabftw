@@ -64,6 +64,10 @@ use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use function rawurldecode;
 use function setcookie;
 use function str_starts_with;
+use function _;
+use function basename;
+use function explode;
+use function time;
 
 /**
  * For all your authentication/login needs
@@ -98,20 +102,7 @@ final class LoginController implements ControllerInterface
     #[Override]
     public function getResponse(): Response
     {
-        // store the rememberme choice in a cookie, not the session as it won't follow up for saml
-        $icanhazcookies = '0';
-        if ($this->Request->request->has('rememberme') && $this->config['remember_me_allowed'] === '1') {
-            $icanhazcookies = '1';
-        }
-        $cookieOptions = array(
-            'expires' => time() + 300,
-            'path' => '/',
-            'domain' => '',
-            'secure' => true,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        );
-        setcookie('icanhazcookies', $icanhazcookies, $cookieOptions);
+        $icanhazcookies = $this->setRememberMeCookie();
 
         // Get an AuthResponse from an AuthService
         $AuthResponse = $this->getAuthResponse();
@@ -191,7 +182,7 @@ final class LoginController implements ControllerInterface
 
         // All good now we can login the user
         $LoginHelper = new LoginHelper($AuthResponse, $this->Session, (int) $this->config['cookie_validity_time']);
-        $LoginHelper->login((bool) $icanhazcookies);
+        $LoginHelper->login($icanhazcookies);
 
         // cleanup
         $this->Session->remove('auth_userid');
@@ -206,6 +197,31 @@ final class LoginController implements ControllerInterface
             }
         }
         return new RedirectResponse($location);
+    }
+
+    /**
+     * Store the rememberme choice in a cookie, not the session as it won't follow up for saml
+     */
+    private function setRememberMeCookie(): bool
+    {
+        if ($this->config['remember_me_allowed'] === '0') {
+            return false;
+        }
+        // avoid setting it if it's present
+        if ($this->Request->cookies->has('icanhazcookies')) {
+            return $this->Request->cookies->getBoolean('icanhazcookies');
+        }
+        $icanhazcookies = $this->Request->request->has('rememberme') ? '1' : '0';
+        $cookieOptions = array(
+            'expires' => time() + 300,
+            'path' => '/',
+            'domain' => '',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        );
+        setcookie('icanhazcookies', $icanhazcookies, $cookieOptions);
+        return $icanhazcookies === '1';
     }
 
     /**
@@ -346,7 +362,7 @@ final class LoginController implements ControllerInterface
                 // MFA AUTH
             case AuthType::Mfa:
                 return new Mfa(
-                    new MfaHelper($this->Session->get('mfa_secret') ?? $this->Request->request->get('mfa_secret')),
+                    new MfaHelper($this->Session->get('mfa_secret')),
                     $this->Session->get('auth_userid'),
                     $this->Request->request->getAlnum('mfa_code'),
                 );

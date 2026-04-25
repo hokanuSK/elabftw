@@ -18,6 +18,8 @@ use PDO;
 
 use function array_sum;
 use function count;
+use function rtrim;
+use function sprintf;
 
 /**
  * Fingerprints for compounds
@@ -89,7 +91,7 @@ final class Fingerprints
             $sql .= sprintf(' AND fp%d & %d = %d', $key, $value, $value);
         }
         $req = $this->Db->prepare($sql . ' LIMIT 2');
-        $req->execute();
+        $this->Db->execute($req);
         return $req->fetchAll();
     }
 
@@ -101,7 +103,7 @@ final class Fingerprints
             $sql .= ' WHERE compounds_fingerprints.id IS NULL';
         }
         $req = $this->Db->prepare($sql);
-        $req->execute();
+        $this->Db->execute($req);
         return $req->fetchAll();
     }
 

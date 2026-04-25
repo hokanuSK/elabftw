@@ -23,6 +23,7 @@ use function array_key_last;
 use function implode;
 use function round;
 use function sprintf;
+use function _;
 
 /**
  * Generate experiments statistics for a user (shown on profile page)
@@ -101,7 +102,7 @@ final class UserStats
         $req = $this->Db->prepare($this->getSQL(true));
         $req->bindParam(':userid', $this->Users->userData['userid'], PDO::PARAM_INT);
         $req->bindValue(':state', State::Normal->value, PDO::PARAM_INT);
-        $req->execute();
+        $this->Db->execute($req);
         $countExpWithoutStatus = $req->fetchColumn();
 
         // prepare sql query for experiments with status
@@ -122,7 +123,7 @@ final class UserStats
             } else {
                 // now get the count
                 $req->bindParam(':status', $status['id'], PDO::PARAM_INT);
-                $req->execute();
+                $this->Db->execute($req);
                 $this->pieData[$lastKey]['count'] = $req->fetchColumn();
             }
 

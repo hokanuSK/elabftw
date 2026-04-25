@@ -23,6 +23,11 @@ use Elabftw\Params\DisplayParams;
 use Exception;
 use Symfony\Component\HttpFoundation\Response;
 
+use function _;
+use function array_column;
+use function array_filter;
+use function in_array;
+
 /**
  * Scheduler to book resources
  */

@@ -12,12 +12,15 @@ declare(strict_types=1);
 
 namespace Elabftw\Enums;
 
+use Elabftw\Exceptions\ImproperActionException;
 use Elabftw\Models\AbstractEntity;
 use Elabftw\Models\Experiments;
 use Elabftw\Models\Items;
 use Elabftw\Models\ItemsTypes;
 use Elabftw\Models\Templates;
 use Elabftw\Models\Users\Users;
+
+use function _;
 
 enum EntityType: string
 {
@@ -36,13 +39,23 @@ enum EntityType: string
         };
     }
 
-    public function toTemplateType(Users $users, ?int $entityId = null, ?bool $bypassReadPermission = null, ?bool $bypassWritePermission = null): AbstractEntity
+    public function toTemplateEntity(Users $users, ?int $entityId = null, ?bool $bypassReadPermission = null, ?bool $bypassWritePermission = null): AbstractEntity
     {
         return match ($this) {
             self::Experiments,
             self::Templates  => new Templates($users, $entityId, $bypassReadPermission, $bypassWritePermission),
             self::Items,
             self::ItemsTypes => new ItemsTypes($users, $entityId, $bypassReadPermission, $bypassWritePermission),
+        };
+    }
+
+    public function asTemplateTypeOrNull(): ?EntityType
+    {
+        return match ($this) {
+            self::Experiments => self::Templates,
+            self::Templates  => null,
+            self::Items => self::ItemsTypes,
+            self::ItemsTypes => null,
         };
     }
 
@@ -72,6 +85,22 @@ enum EntityType: string
         return $prefix . '-status.php';
     }
 
+    public function toStatusTable(): string
+    {
+        return match ($this) {
+            self::Experiments, self::Templates => 'experiments_status',
+            self::Items, self::ItemsTypes => 'items_status',
+        };
+    }
+
+    public function toCategoryTable(): string
+    {
+        return match ($this) {
+            self::Experiments, self::Templates => 'experiments_categories',
+            self::Items, self::ItemsTypes => 'items_categories',
+        };
+    }
+
     // for use in the "genre" attribute of .eln node
     public function toGenre(): string
     {
@@ -90,6 +119,38 @@ enum EntityType: string
             self::Items => 'database.php',
             self::Templates => 'templates.php',
             self::ItemsTypes => 'resources-templates.php',
+        };
+    }
+
+    public function toInt(): int
+    {
+        return match ($this) {
+            self::Experiments => 1,
+            self::Items => 2,
+            self::Templates => 3,
+            self::ItemsTypes => 4,
+        };
+    }
+
+    public static function fromInt(?int $int): ?self
+    {
+        return match ($int) {
+            1 => self::Experiments,
+            2 => self::Items,
+            3 => self::Templates,
+            4 => self::ItemsTypes,
+            null => null,
+            default => throw new ImproperActionException('Invalid integer value for entityType'),
+        };
+    }
+
+    public function toHuman(): string
+    {
+        return match ($this) {
+            self::Experiments => _('Experiments'),
+            self::Items => _('Resources'),
+            self::Templates => _('Experiment templates'),
+            self::ItemsTypes => _('Resource templates'),
         };
     }
 }

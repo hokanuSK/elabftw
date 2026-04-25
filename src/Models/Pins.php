@@ -14,7 +14,11 @@ namespace Elabftw\Models;
 
 use Elabftw\Elabftw\Db;
 use Elabftw\Elabftw\Tools;
+use Elabftw\Enums\AccessType;
 use PDO;
+
+use function array_column;
+use function sprintf;
 
 /**
  * For dealing with pinned items
@@ -88,7 +92,7 @@ final class Pins
      */
     public function addToPinned(): bool
     {
-        $this->Entity->canOrExplode('read');
+        $this->Entity->canOrExplode(AccessType::Read);
 
         $sql = 'INSERT IGNORE INTO pin_' . $this->Entity->entityType->value . '2users(users_id, entity_id) VALUES (:users_id, :entity_id)';
         $req = $this->Db->prepare($sql);
@@ -103,7 +107,7 @@ final class Pins
      */
     private function rmFromPinned(): bool
     {
-        $this->Entity->canOrExplode('read');
+        $this->Entity->canOrExplode(AccessType::Read);
 
         $sql = 'DELETE FROM pin_' . $this->Entity->entityType->value . '2users WHERE entity_id = :entity_id AND users_id = :users_id';
         $req = $this->Db->prepare($sql);

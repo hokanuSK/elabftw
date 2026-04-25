@@ -10,11 +10,50 @@
 @use './variables';
 @import 'tom-select/dist/scss/tom-select.bootstrap4';
 
+.ts-control .item {
+  background-color: var(--superlight);
+  border-radius: 0.18rem;
+  color: var(--strongest);
+  white-space: nowrap;
+}
+
+.dark-mode {
+  .ts-control {
+    background-color: var(--mainbackground);
+    border: 1px solid var(--secondary-muted);
+  }
+
+  #filterOwner-ts-control {
+    background-color: var(--mainbackground);
+    color: var(--mediumstrong);
+  }
+
+  .ts-dropdown,
+  .ts-dropdown-content {
+    background-color: var(--mainbackground);
+    color: var(--mediumstrong);
+
+    .active {
+      background-color: var(--secondary-muted);
+      color: var(--mediumstrong);
+    }
+  }
+}
+
+.items-placeholder {
+  color: var(--mediumstrong) !important;
+}
+
+.dropdown-header {
+  border: 0 !important;
+}
+
+// dropdown input e.g., in filter owner
 .focus .ts-control,
 .plugin-dropdown_input.focus .ts-dropdown .dropdown-input { /* stylelint-disable-line selector-class-pattern -- next-line does not work here */
-  border-color: variables.$elabblue;
+  border: 1px solid var(--primary);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(41, 174, 185, 0.6);
-  outline: 0;
+  color: var(--mediumstrong);
 }
 
 .ts-dropdown {
@@ -27,18 +66,7 @@
 }
 
 .ts-wrapper {
-  max-width: clamp(var(--breakpoint-sm), 50vw, 90vw);
-
-  .ts-control .item {
-    background: variables.$superlight;
-    border: 0 solid variables.$firstlevel;
-    border-radius: calc(0.25rem - 1px);
-    color: variables.$mediumstrong;
-    cursor: pointer;
-    padding: 1px 5px;
-    white-space: nowrap;
-  }
-
+  max-width: clamp(var(--breakpoint-sm), 35vw, 80vw);
   // don't block down button
   .ts-control:not(.rtl) {
     padding-right: 2rem !important;
@@ -50,27 +78,29 @@
     .ts-control {
       flex-wrap: nowrap;
       gap: 4px;
-      max-width: 400px;
-      min-height: 38px;
       overflow-x: auto;
-      padding: 4px 8px;
+      position: relative;
       scrollbar-width: thin;
+
+      // when there's multiple items, e.g., tags filter in show page
+      .item {
+        background-color: var(--superlight);
+        color: var(--strongest);
+      }
 
       &::-webkit-scrollbar {
         height: 4px;
       }
 
       &::-webkit-scrollbar-thumb {
-        background: variables.$firstlevel;
+        background: var(--firstlevel);
         border-radius: 2px;
       }
 
       .clear-button {
-        background: variables.$white !important;
-        position: sticky;
-        right: -2rem;
-        // top attribute not applying
-        transform: translateY(0);
+        background-color: var(--secondlevel);
+        color: var(--mediumstrong);
+        position: absolute;
       }
     }
   }
@@ -114,10 +144,20 @@
   }
 }
 
+// div containing the selected items from tom-select multi-inputs (permissions modal)
+.ts-wrapper {
+  position: relative; /* see https://tom-select.js.org/plugins/no-backspace-delete/ */
+
+  .ts-control {
+    display: flex;
+    flex-wrap: wrap !important; // override forced default
+  }
+}
+
 .selected-item-badge {
-  background-color: var(--badge-color, #000);
+  background-color: var(--badge-color, var(--mainbackground));
   border-radius: 999px;
-  color: variables.$mainbackground;
+  color: var(--chrome-fg);
   font-size: 1.2rem;
   margin: 0 6px 6px 0;
   padding: 4px 10px;

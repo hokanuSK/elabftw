@@ -13,6 +13,7 @@ import tinymce from 'tinymce/tinymce';
 import { notify } from './notify';
 import TableSorting from './TableSorting.class';
 declare const MathJax: MathJaxObject;
+import { Malle, InputType } from '@deltablot/malle';
 import $ from 'jquery';
 import i18next from './i18n';
 import { ApiC } from './api';
@@ -56,8 +57,16 @@ export function relativeMoment(): void {
     if (span.innerText) {
       return;
     }
-    span.innerText = DateTime.fromFormat(span.title, 'yyyy-MM-dd HH:mm:ss', {'locale': locale}).toRelative();
+    span.innerText = toRelative(span.title, locale);
   });
+}
+
+export function toRelative(title: string, locale: string): string {
+  return (
+    DateTime
+      .fromFormat(title, 'yyyy-MM-dd HH:mm:ss', {'locale': locale})
+      .toRelative() ?? ''
+  );
 }
 
 // Add a listener for all elements triggered by an event
@@ -84,7 +93,7 @@ async function triggerHandler(event: Event, el: HTMLInputElement): Promise<void>
   // END CUSTOM ACTIONS
 
   if (el.dataset.transform === 'permissionsToJson') {
-    value = permissionsToJson(parseInt(value, 10), []);
+    value = permissionsToJson([]);
   }
   if (el.dataset.value) {
     value = el.dataset.value;
@@ -130,7 +139,7 @@ async function triggerHandler(event: Event, el: HTMLInputElement): Promise<void>
 
 // data-reload can be "page" for full page, "reloadEntitiesShow" for entities in show mode,
 // or a comma separated list of ids of elements to reload
-export function handleReloads(reloadAttributes: string | undefined): void {
+export async function handleReloads(reloadAttributes: string | undefined): Promise<void> {
   if (!reloadAttributes) return;
 
   if (reloadAttributes === 'page') {
@@ -139,13 +148,48 @@ export function handleReloads(reloadAttributes: string | undefined): void {
   }
 
   const reloadTargets = reloadAttributes.split(',');
-  reloadTargets.forEach((toReload) => {
+  for (const toReload of reloadTargets) {
     if (toReload === 'reloadEntitiesShow') {
-      reloadEntitiesShow();
+      await reloadEntitiesShow();
     } else {
-      reloadElements([toReload]).then(() => relativeMoment());
+      await reloadElements([toReload]);
     }
-  });
+  }
+}
+
+type TomSelectOption = {
+  value: string;
+  text: string;
+};
+
+type RebuildSource =
+  | { filter?: (option: HTMLOptionElement) => boolean }
+  | { options: TomSelectOption[] };
+
+export function rebuildTomSelectOptions(
+  selectEl: HTMLSelectElement & { tomselect?: TomSelect },
+  source: RebuildSource = {},
+): void {
+  const ts = selectEl.tomselect;
+  if (!ts) return;
+
+  let nextOptions: TomSelectOption[] = [];
+
+  if ('options' in source) {
+    nextOptions = source.options;
+  } else {
+    const filter = source.filter;
+    nextOptions = Array.from(selectEl.options)
+      .filter((option) => !filter || filter(option))
+      .map((option) => ({
+        value: option.value,
+        text: option.textContent ?? '',
+      }));
+  }
+
+  ts.clearOptions();
+  ts.addOptions(nextOptions);
+  ts.refreshOptions(false);
 }
 
 export function listenTrigger(elementId: string = ''): void {
@@ -187,7 +231,9 @@ export function collectForm(form: HTMLElement): object {
       el.classList.add('border-danger');
       el.focus();
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      throw new Error('Invalid input found! Aborting.');
+      // TODO maybe have "Input validation failed" or something more user friendly. That Invalid syntax error is weird.
+      notify.error('invalid-info');
+      throw new Error(i18next.t('invalid-info'));
     }
     let value = el.value;
     if (el.type === 'checkbox') {
@@ -204,7 +250,7 @@ export function collectForm(form: HTMLElement): object {
 export function clearForm(form: HTMLElement): void {
   ['input', 'select', 'textarea'].forEach(inp => {
     form.querySelectorAll(inp).forEach((input: HTMLInputElement) => {
-      if (input.dataset.noBlank !== '1') {
+      if (input.dataset.noBlank !== '1' && input.type !== 'radio') {
         input.value = '';
         if (input.type === 'checkbox') {
           input.checked = false;
@@ -214,8 +260,8 @@ export function clearForm(form: HTMLElement): void {
   });
 }
 
-export function getEntityTypeFromPage(): EntityType {
-  const scriptName = location.pathname.split('/').pop() || '';
+export function getEntityTypeFromPage(loc: Location): EntityType {
+  const scriptName = loc.pathname.split('/').pop() || '';
   switch (scriptName) {
   case 'experiments.php':
     return EntityType.Experiment;
@@ -230,14 +276,13 @@ export function getEntityTypeFromPage(): EntityType {
   }
 }
 
-
 // for view or edit mode, get type and id from the page to construct the entity object
 // enable usage with parent Window for iframe cases (e.g., with spreadsheet editor)
 export function getEntity(useParent: boolean = false): Entity {
   let entityId: number | null = null;
-  const entityType: EntityType = getEntityTypeFromPage();
   // pick the right location (parent or self)
   const loc = useParent ? window.parent.location : window.location;
+  const entityType: EntityType = getEntityTypeFromPage(loc);
   const params = new URLSearchParams(loc.search);
   if (params.has('id')) {
     entityId = parseInt(params.get('id')!, 10);
@@ -246,6 +291,67 @@ export function getEntity(useParent: boolean = false): Entity {
     type: entityType,
     id: entityId,
   };
+}
+
+// Listen for malleable columns
+export function makeMalleableColumnsGreatAgain() {
+  new Malle({
+    onEdit: (original, _, input) => {
+      if (original.innerText === 'unset') {
+        input.value = '';
+        original.classList.remove('font-italic');
+      }
+      if (original.dataset.inputType === 'number') {
+        // use setAttribute here because type is readonly property
+        input.setAttribute('type', 'number');
+      }
+      return true;
+    },
+    cancel : i18next.t('cancel'),
+    cancelClasses: ['btn', 'btn-danger', 'mt-2', 'ml-1'],
+    inputClasses: ['form-control'],
+    fun: (value, original) => {
+      const params = {};
+      params[original.dataset.target] = value;
+      return ApiC.patch(`${original.dataset.endpoint}/${original.dataset.id}`, params)
+        .then(res => res.json())
+        .then(json => json[original.dataset.target]);
+    },
+    listenOn: '.malleableColumn',
+    returnedValueIsTrustedHtml: false,
+    submit : i18next.t('save'),
+    submitClasses: ['btn', 'btn-primary', 'mt-2'],
+    tooltip: i18next.t('click-to-edit'),
+  }).listen();
+
+  // MALLEABLE QTY_UNIT - we need a specific code to add the select options
+  new Malle({
+    cancel : i18next.t('cancel'),
+    cancelClasses: ['btn', 'btn-danger', 'mt-2', 'ml-1'],
+    inputClasses: ['form-control'],
+    inputType: InputType.Select,
+    selectOptions: [
+      {selected: false, text: '•', value: '•'},
+      {selected: false, text: 'μL', value: 'μL'},
+      {selected: false, text: 'mL', value: 'mL'},
+      {selected: false, text: 'L', value: 'L'},
+      {selected: false, text: 'μg', value: 'μg'},
+      {selected: false, text: 'mg', value: 'mg'},
+      {selected: false, text: 'g', value: 'g'},
+      {selected: false, text: 'kg', value: 'kg'},
+    ],
+    fun: (value, original) => {
+      return ApiC.patch(`${original.dataset.endpoint}/${original.dataset.id}`, {qty_unit: value})
+        .then(res => res.json())
+        .then(json => json['qty_unit']);
+    },
+    listenOn: '.malleableQtyUnit',
+    returnedValueIsTrustedHtml: false,
+    submit : i18next.t('save'),
+    submitClasses: ['btn', 'btn-primary', 'mt-2'],
+    tooltip: i18next.t('click-to-edit'),
+  }).listen();
+
 }
 
 // SORTABLE ELEMENTS
@@ -313,6 +419,11 @@ export async function reloadEntitiesShow(tag = ''): Promise<void | Response> {
   relativeMoment();
 }
 
+export function getSafeElementById(id: string): HTMLElement {
+  return document.getElementById(id)
+    ?? (() => { throw new Error(`Element could not be found: '${id}'`); })();
+}
+
 export async function reloadElements(elementIds: string[]): Promise<void> {
   elementIds = elementIds.filter((elementId: string): boolean => {
     if (!document.getElementById(elementId)) {
@@ -338,6 +449,7 @@ export async function reloadElements(elementIds: string[]): Promise<void> {
   });
   (new TableSorting()).init();
   makeSortableGreatAgain();
+  makeMalleableColumnsGreatAgain();
   relativeMoment();
 }
 
@@ -504,15 +616,12 @@ export function askFileName(extension: FileType): string | undefined {
   return realName + ext;
 }
 
-export function permissionsToJson(base: number, extra: string[]): string {
+export function permissionsToJson(extra: string[]): string {
   const json = {
-    'base': 0,
     'teams': [],
     'teamgroups': [],
     'users': [],
   };
-
-  json.base = base;
 
   extra.forEach(val => {
     if (val.startsWith('team:')) {
@@ -667,7 +776,7 @@ export async function updateEntityBody(): Promise<void> {
     const lastSavedAt = document.getElementById('lastSavedAt');
     if (lastSavedAt) {
       lastSavedAt.title = json.modified_at;
-      reloadElements(['lastSavedAt']).then(() => relativeMoment());
+      reloadElements(['lastSavedAt']);
     }
   }).catch(() => {
     // detect if the session timedout (Session expired error is thrown)
@@ -693,7 +802,7 @@ export { TomSelect };
 
 // toggle appearance of button
 export function toggleGrayClasses(classList: DOMTokenList): void {
-  ['bgnd-gray', 'hl-hover-gray'].forEach(btnClass => classList.toggle(btnClass, !classList.contains(btnClass)));
+  ['btn-secondary', 'btn-ghost'].forEach(btnClass => classList.toggle(btnClass, !classList.contains(btnClass)));
 }
 
 export function getNewIdFromPostRequest(response: Response): number {
@@ -821,12 +930,12 @@ export async function populateUserModal(user: Record<string, string|number>) {
     // prevent deleting association of the team we are currently logged in, allow it for other users
     if (team.id !== requester.team || user.userid !== requester.userid) {
       const removeTeamBtn = document.createElement('span');
-      removeTeamBtn.classList.add('hl-hover-gray', 'p-1', 'rounded', 'clickable', 'm-1');
+      removeTeamBtn.classList.add('btn', 'btn-danger-ghost', 'btn-sm', 'ml-2');
       removeTeamBtn.title = i18next.t('delete');
       removeTeamBtn.dataset.action = 'destroy-user2team';
       removeTeamBtn.dataset.teamid = team.id;
       const removeTeamIcon = document.createElement('i');
-      removeTeamIcon.classList.add('fas', 'fa-xmark', 'color-blue');
+      removeTeamIcon.classList.add('fas', 'fa-xmark');
       removeTeamBtn.appendChild(removeTeamIcon);
       teamBadge.appendChild(removeTeamBtn);
     }

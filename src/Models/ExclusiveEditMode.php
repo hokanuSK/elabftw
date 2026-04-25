@@ -15,10 +15,12 @@ namespace Elabftw\Models;
 
 use Elabftw\Elabftw\Db;
 use Elabftw\Enums\Action;
+use Elabftw\Enums\AccessType;
 use Elabftw\Exceptions\ImproperActionException;
 use PDO;
 
 use function sprintf;
+use function _;
 
 /**
  * For dealing with exclusive edit mode aka write lock
@@ -97,7 +99,7 @@ final class ExclusiveEditMode
 
     public function activate(): bool
     {
-        $this->Entity->canOrExplode('write');
+        $this->Entity->canOrExplode(AccessType::Write);
         // destroy any leftover first: prevents inserting with same primary id (entity_id)
         $this->destroy();
         $sql = sprintf(

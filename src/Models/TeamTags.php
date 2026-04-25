@@ -22,6 +22,10 @@ use Elabftw\Traits\SetIdTrait;
 use Override;
 use PDO;
 
+use function array_pop;
+use function explode;
+use function sprintf;
+
 /**
  * All about the tag but seen from a team perspective, not an entity
  */
@@ -132,24 +136,36 @@ final class TeamTags extends AbstractRest
             throw new IllegalActionException('Only an admin can delete a tag!');
         }
         // first unreference the tag
-        $sql = 'DELETE FROM tags2entity WHERE tag_id = :tag_id';
+        $sql = 'DELETE tags2entity
+            FROM tags2entity
+            INNER JOIN tags ON tags.id = tags2entity.tag_id
+            WHERE tags2entity.tag_id = :tag_id
+              AND tags.team = :team';
         $req = $this->Db->prepare($sql);
         $req->bindParam(':tag_id', $this->id, PDO::PARAM_INT);
+        $req->bindParam(':team', $this->Users->userData['team'], PDO::PARAM_INT);
         $this->Db->execute($req);
 
         // now delete it from the tags table
-        $sql = 'DELETE FROM tags WHERE id = :tag_id';
+        $sql = 'DELETE FROM tags WHERE id = :tag_id AND team = :team';
         $req = $this->Db->prepare($sql);
         $req->bindParam(':tag_id', $this->id, PDO::PARAM_INT);
+        $req->bindParam(':team', $this->Users->userData['team'], PDO::PARAM_INT);
         return $this->Db->execute($req);
     }
 
     private function getTagIdFromTag(TagParam $params): int
     {
-        $sql = 'SELECT id FROM tags WHERE tag = :tag AND team = :team';
+        $sql = 'SELECT id
+            FROM tags
+            WHERE tag = :tag
+              AND team = :team
+              AND id <> :id
+            LIMIT 1';
         $req = $this->Db->prepare($sql);
         $req->bindParam(':team', $this->Users->userData['team'], PDO::PARAM_INT);
         $req->bindValue(':tag', $params->getContent());
+        $req->bindValue(':id', $this->id ?? 0, PDO::PARAM_INT);
         $this->Db->execute($req);
         return (int) $req->fetchColumn();
     }

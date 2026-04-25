@@ -22,6 +22,11 @@ use Elabftw\Traits\SetIdTrait;
 use Override;
 use PDO;
 
+use function array_map;
+use function count;
+use function json_decode;
+use function sprintf;
+
 /**
  * An IDP is an Identity Provider. Used in SAML2 authentication context.
  */
@@ -70,6 +75,11 @@ final class Idps extends AbstractRest
     public function readOne(): array
     {
         $this->requester->isSysadminOrExplode();
+        return $this->selectOne();
+    }
+
+    public function selectOne(): array
+    {
         $sql = sprintf($this->getReadSql(), 'WHERE idps.id = :id');
         $req = $this->Db->prepare($sql);
         $req->bindParam(':id', $this->id, PDO::PARAM_INT);
@@ -158,7 +168,7 @@ final class Idps extends AbstractRest
             }
             $this->setId($id);
             // when coming from XML, we do not overwrite these attributes
-            $immutableFields = array('email_attr', 'fname_attr', 'lname_attr', 'team_attr', 'orgid_attr');
+            $immutableFields = array('name', 'email_attr', 'fname_attr', 'lname_attr', 'team_attr', 'orgid_attr');
             foreach ($immutableFields as $key) {
                 unset($idp[$key]);
             }

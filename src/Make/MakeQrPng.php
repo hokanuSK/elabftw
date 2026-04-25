@@ -19,10 +19,14 @@ use Imagick;
 use ImagickDraw;
 use ImagickPixel;
 use RobThree\Auth\Providers\Qr\IQRCodeProvider;
-use RuntimeException;
 use Override;
 
 use function strlen;
+use function count;
+use function dirname;
+use function mb_strlen;
+use function mb_substr;
+use function sprintf;
 
 /**
  * Generate a PNG image with a QR Code pointing to the URL of the Entity, and optionally include the title
@@ -111,9 +115,6 @@ final class MakeQrPng extends AbstractMake implements StringMakerInterface
         $newImage->setImageFormat('png');
 
         $blob = $newImage->getImageBlob();
-        if ($blob === null) {
-            throw new RuntimeException('Error generating the QR code image :/');
-        }
         // use strlen for binary data, not mb_strlen
         $this->contentSize = strlen($blob);
         return $blob;

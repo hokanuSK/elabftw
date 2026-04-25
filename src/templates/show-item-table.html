@@ -4,15 +4,19 @@
   {# DATE #}
   <td class='item-date'>
     {# checkbox #}
-    <input autocomplete='off' type='checkbox' data-action='checkbox-entity' data-id='{{ item.id }}' data-randomid='{{ randomId }}' data-type='{{ Entity.entityType.value }}' aria-label='{{ 'Select'|trans }}' style='width:15px;' />
-    {{ item.date|date('Y-m-d') }}
+    <input autocomplete='off' type='checkbox' data-action='checkbox-entity' data-id='{{ item.id }}' data-randomid='{{ randomId }}' data-type='{{ Entity.entityType.value }}' data-state='{{ item.state }}' aria-label='{{ 'Select'|trans }}' style='width:15px;' />
+   {% if Entity.entityType.value in ['experiments_templates', 'items_types'] %}
+        {{ item.created_at|date('Y-m-d') }}
+   {% else %}
+        {{ item.date|date('Y-m-d') }}
+    {% endif %}
   </td>
 
   {# TITLE #}
   <td class='title'>
     {# edit icon #}
     {% if not item.locked and (item.userid == App.Users.userData.userid or Entity.entityType.value == 'items' or App.Users.isAdmin) %}
-      <a href='{{ Entity.entityType.toPage }}?mode=edit&amp;id={{ item.id }}' class='btn p-2 hl-hover-gray lh-normal border-0 my-n2' title='{{ 'Edit'|trans }}' aria-label='{{ 'Edit'|trans }}'>
+      <a href='{{ Entity.entityType.toPage }}?mode=edit&amp;id={{ item.id }}' class='btn btn-ghost border-0' title='{{ 'Edit'|trans }}' aria-label='{{ 'Edit'|trans }}'>
         <i class='fas fa-fw fa-pencil-alt'></i>
       </a>
     {% endif %}
@@ -24,10 +28,14 @@
     {% if item.state == enum('Elabftw\\Enums\\State').Archived.value %}
       <i class='fas fa-box-archive fa-fw'></i>
     {% endif %}
+    {# deleted icon #}
+    {% if item.state == enum('Elabftw\\Enums\\State').Deleted.value %}
+      <i class='fas fa-ban fa-fw color-danger'></i>
+    {% endif %}
     {# toggle body #}
-    <button class='btn p-2 hl-hover-gray lh-normal border-0 my-n2' data-type='{{ Entity.entityType.value }}' data-id='{{ item.id }}' data-randid={{ randomId }} data-action='toggle-body' data-opened-icon='fa-square-minus' data-closed-icon='fa-square-plus' title='{{ 'Toggle content'|trans }}' aria-label='{{ 'Toggle content'|trans }}'><i class='fas fa-square-plus fa-fw link-like'></i></button>
+    <button class='btn btn-ghost border-0' data-type='{{ Entity.entityType.value }}' data-id='{{ item.id }}' data-randid={{ randomId }} data-action='toggle-body' data-opened-icon='fa-square-minus' data-closed-icon='fa-square-plus' title='{{ 'Toggle content'|trans }}' aria-label='{{ 'Toggle content'|trans }}'><i class='fas fa-square-plus fa-fw link-like'></i></button>
     {% if item.custom_id %}
-      <span class='color-medium' title='{{ 'Custom ID'|trans }}'>{{ item.custom_id }}</span>
+      <span title='{{ 'Custom ID'|trans }}'>{{ item.custom_id }}</span>
     {% endif %}
     <a href='{{ Entity.entityType.toPage }}?mode=view&amp;id={{ item.id }}'>{{ item.title }}</a>
   </td>
@@ -39,17 +47,13 @@
       {% set stepsArr = item.next_step|split('|') %}
       {% set next = stepsArr|first %}
     {% endif %}
-    <span class='item-next-step'>{{ next }}</span>
+    {{ next }}
   </td>
 
   {# CATEGORY #}
   <td class='item-next'>
-    {# timestamp icon #}
-    {% if item.timestamped %}
-      <i class='far fa-calendar-check mr-1'></i>
-    {% endif %}
     {% if item.category %}
-      <button type='button' data-action='add-query-filter' data-key='category' data-value='{{ item.category|e('html_attr') }}' class='btn catstat-btn category-btn lh-normal border-0' style='--bg:#{{ item.category_color }}'>{{ item.category_title }}</button>
+      <button type='button' data-action='add-query-filter' data-key='category' data-value='{{ item.category|e('html_attr') }}' class='btn catstat-btn category-btn lh-normal' style='--bg:#{{ item.category_color }}'>{{ item.category_title }}</button>
     {% endif %}
   </td>
 
@@ -79,7 +83,7 @@
   </td>
 
   <td class='item-owner'>
-    <button type='button' class='btn lh-normal border-0' style='font-weight:500;' data-action='add-query-filter' data-key='owner' data-value='{{ item.userid }}'>{{ item.fullname }}</button>
+    <span style='font-weight:500;' data-action='add-query-filter' data-key='owner' data-value='{{ item.userid }}'>{{ item.fullname }}</span>
   </td>
 
 </tr>
@@ -87,7 +91,7 @@
 {# a random id is used because with the favorites the item can appear two times on the page so the old blah_123 doesn't work well #}
 <tr hidden id='{{ randomId }}' style='border-left: 4px solid #{{ item.category_color }}'>
   <td colspan='8'>
-    <div style='overflow:auto;margin: 10px 0 0 20px'></div>
+    <div class='d-flex flex-column align-items-start'></div>
   </td>
 </tr>
 

@@ -27,6 +27,8 @@ use Elabftw\Services\TeamsHelper;
 use Elabftw\Services\UserArchiver;
 use PDO;
 
+use function count;
+
 /**
  * Manage the link between users and teams
  */
@@ -153,7 +155,8 @@ final class Users2Teams
         if ($promoteToAdmin
             && (Config::getConfig())->configArr['onboarding_email_active'] === '1'
         ) {
-            (new OnboardingEmail(-1, $promoteToAdmin))->create($userid);
+            $targetUser = new Users($userid);
+            (new OnboardingEmail($targetUser, -1, $promoteToAdmin))->create();
         }
         /** @psalm-suppress PossiblyNullArgument */
         AuditLogs::create(new PermissionLevelChanged($this->requester->userid, $userid, Users2TeamsTargets::IsAdmin, $isAdmin->value, $teamid));

@@ -30,6 +30,12 @@ use function array_keys;
 use function in_array;
 use function sprintf;
 use function strlen;
+use function _;
+use function implode;
+use function is_array;
+use function json_decode;
+use function preg_match;
+use function str_starts_with;
 
 /**
  * When values need to be checked
@@ -113,22 +119,10 @@ final class Check
         return $value->value;
     }
 
-    /**
-     * Check if we have a correct value for visibility
-     */
-    public static function visibility(string $visibility): string
+    public static function basePermission(int $input): BasePermissions
     {
-        try {
-            $decoded = json_decode($visibility, true, self::PERMISSIONS_JSON_MAX_DEPTH, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            throw new ImproperActionException('The visibility parameter could not be decoded as JSON.');
-        }
         // server-side check for allowed base permissions (e.g., 10, 20, 30 etc.)
-        $base = BasePermissions::tryFrom($decoded['base']);
-        if ($base === null) {
-            throw new ImproperActionException('The base visibility parameter is not valid.');
-        }
-
+        $base = BasePermissions::tryFrom($input) ?? throw new ImproperActionException('The base visibility parameter is not valid.');
         // Enforce that base is one of the active permissions
         $Config = Config::getConfig();
         // get human readable to display an indicative error
@@ -144,9 +138,23 @@ final class Check
                 )
             );
         }
+        return $base;
+    }
+
+    /**
+     * Check if we have a correct value for canread, canwrite or canbook JSON
+     */
+    public static function visibility(string $visibility): string
+    {
+        try {
+            $decoded = json_decode($visibility, true, self::PERMISSIONS_JSON_MAX_DEPTH, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new ImproperActionException('The visibility parameter could not be decoded as JSON.');
+        }
+
         $arrayParams = array('teams', 'teamgroups', 'users');
         foreach ($arrayParams as $param) {
-            if (!is_array($decoded[$param])) {
+            if (!isset($decoded[$param]) || !is_array($decoded[$param])) {
                 throw new ImproperActionException(sprintf('The visibility parameter %s is wrong.', $param));
             }
         }

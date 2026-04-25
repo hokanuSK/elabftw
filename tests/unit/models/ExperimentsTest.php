@@ -14,7 +14,9 @@ namespace Elabftw\Models;
 use Elabftw\Enums\Action;
 use Elabftw\Enums\BasePermissions;
 use Elabftw\Enums\EntityType;
+use Elabftw\Enums\FileFromString;
 use Elabftw\Enums\Meaning;
+use Elabftw\Enums\AccessType;
 use Elabftw\Enums\State;
 use Elabftw\Exceptions\IllegalActionException;
 use Elabftw\Exceptions\ImproperActionException;
@@ -26,6 +28,11 @@ use Elabftw\Params\ExtraFieldsOrderingParams;
 use Elabftw\Services\Check;
 use Elabftw\Traits\TestsUtilsTrait;
 use Symfony\Component\HttpFoundation\InputBag;
+
+use function count;
+use function is_array;
+use function json_decode;
+use function sprintf;
 
 class ExperimentsTest extends \PHPUnit\Framework\TestCase
 {
@@ -41,17 +48,12 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
         $this->Experiments = $this->getFreshExperimentWithGivenUser($this->Users);
     }
 
-    public function testGetSurroundingBookers(): void
-    {
-        $this->assertEmpty($this->Experiments->getSurroundingBookers());
-    }
-
     public function testCreateAndDestroy(): void
     {
         $new = $this->Experiments->create();
         $this->assertTrue((bool) Check::id($new));
         $this->Experiments->setId($new);
-        $this->Experiments->canOrExplode('write');
+        $this->Experiments->canOrExplode(AccessType::Write);
         // test archive too
         $exp = $this->Experiments->patch(Action::Archive, array());
         $this->assertIsArray($exp);
@@ -81,11 +83,11 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals(State::Normal->value, $exp['state']);
         $this->Experiments->destroy();
         $Templates = new Templates($this->Users);
-        $Templates->create(title: 'my template');
-        $new = $this->Experiments->createFromTemplate(1);
+        $tpl = $Templates->create(title: 'my template');
+        $new = $this->Experiments->createFromTemplate($tpl);
         $this->assertTrue((bool) Check::id($new));
-        $this->Experiments = new Experiments($this->Users, $new);
-        $this->Experiments->destroy();
+        $newExp = new Experiments($this->Users, $new);
+        $this->assertTrue($newExp->destroy());
     }
 
     public function testSetId(): void
@@ -107,7 +109,7 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
         $all = $this->Experiments->readAll($DisplayParams);
         $this->assertEquals(1, count($all));
         $this->Experiments->setId($new);
-        $this->Experiments->canOrExplode('read');
+        $this->Experiments->canOrExplode(AccessType::Read);
         $experiment = $this->Experiments->readOne();
         $this->assertTrue(is_array($experiment));
         $this->assertEquals($title, $experiment['title']);
@@ -162,19 +164,50 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
 
     public function testUpdateVisibility(): void
     {
-        $matrix = array('canread', 'canwrite');
+        $matrix = array('canread_base', 'canwrite_base');
         foreach ($matrix as $column) {
-            $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => BasePermissions::Full->toJson())));
-            $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => BasePermissions::Organization->toJson())));
-            $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => BasePermissions::Team->toJson())));
-            $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => BasePermissions::User->toJson())));
-            $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => BasePermissions::UserOnly->toJson())));
+            foreach (BasePermissions::cases() as $perm) {
+                $this->assertIsArray($this->Experiments->patch(Action::Update, array($column => $perm->value)));
+            }
         }
     }
 
     public function testUpdateCategory(): void
     {
         $this->assertIsArray($this->Experiments->patch(Action::Update, array('category' => '3')));
+    }
+
+    public function testUpdateOwnership(): void
+    {
+        $user1 = new Users(1, 1);
+        $user2 = new Users(2, 1);
+        $exp = $this->getFreshExperimentWithGivenUser($user1);
+        $params = array('userid' => $user2->userid, 'team' => $user2->getTeam());
+        // no readOne after ownership change
+        $exp->patch(Action::UpdateOwner, $params);
+        $entityData = $exp->readOne();
+        $this->assertEquals($user2->userid, $entityData['userid']);
+        $this->assertEquals($user2->team, $entityData['team']);
+    }
+
+    public function testUpdateOwnershipWrongTeamCombination(): void
+    {
+        $user1 = new Users(1, 1);
+        $user2 = new Users(2, 2);
+        $exp = $this->getFreshExperimentWithGivenUser($user1);
+        $params = array('userid' => $user2->userid, 'team' => 17);
+        $this->expectException(UnprocessableContentException::class);
+        $exp->patch(Action::UpdateOwner, $params);
+    }
+
+    public function testUpdateOwnershipToDifferentTeamIsRestrictedToAdmins(): void
+    {
+        $user1 = new Users(1, 1);
+        $user1->isAdmin = false;
+        $user2 = new Users(2, 2);
+        $exp = $this->getFreshExperimentWithGivenUser($user1);
+        $this->expectException(IllegalActionException::class);
+        $exp->patch(Action::UpdateOwner, array('userid' => $user2->userid, 'team' => 2));
     }
 
     public function testUpdateWithNegativeInt(): void
@@ -220,24 +253,29 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
     {
         $this->Experiments->ItemsLinks->setId(1);
         $this->Experiments->ExperimentsLinks->setId(1);
-        $this->Experiments->canOrExplode('read');
+        $this->Experiments->canOrExplode(AccessType::Read);
         // add specific permissions so we can check it later in the duplicated entry
-        $canread = BasePermissions::Organization->toJson();
-        $canwrite = BasePermissions::UserOnly->toJson();
+        $canread = BasePermissions::Organization;
+        $canwrite = BasePermissions::UserOnly;
         // also add some custom settings like hiding main text
-        $this->Experiments->patch(Action::Update, array('canread' => $canread, 'canwrite' => $canwrite, 'hide_main_text' => 1));
+        $this->Experiments->patch(Action::Update, array('canread_base' => $canread->value, 'canwrite_base' => $canwrite->value, 'hide_main_text' => 1));
         // add some steps and links in there, too
         $this->Experiments->Steps->postAction(Action::Create, array('body' => 'some step'));
         $this->Experiments->ItemsLinks->postAction(Action::Create, array());
         $this->Experiments->ExperimentsLinks->postAction(Action::Create, array());
-        $id = $this->Experiments->postAction(Action::Duplicate, array());
+        // add some uploads
+        $this->Experiments->Uploads->createFromString(FileFromString::Json, 'normal.json', '{}');
+        $archivedId = $this->Experiments->Uploads->createFromString(FileFromString::Json, 'archived.json', '{}');
+        $this->Experiments->Uploads->setId($archivedId);
+        $this->Experiments->Uploads->patch(Action::Archive, array());
+        $id = $this->Experiments->postAction(Action::Duplicate, array('copyFiles' => 1));
         $this->assertIsInt($id);
         $new = new Experiments($this->Users, $id);
-        $actualCanread = json_decode($new->entityData['canread'], true);
-        $actualCanwrite = json_decode($new->entityData['canwrite'], true);
-        $this->assertEquals(BasePermissions::Organization->value, $actualCanread['base']);
-        $this->assertEquals(BasePermissions::UserOnly->value, $actualCanwrite['base']);
+        $this->assertEquals($canread->value, $new->entityData['canread_base']);
+        $this->assertEquals($canwrite->value, $new->entityData['canwrite_base']);
         $this->assertEquals(1, $new->entityData['hide_main_text']);
+        // only active files are duplicated
+        $this->assertCount(1, $new->Uploads->readAll());
     }
 
     public function testInsertTags(): void
@@ -255,7 +293,7 @@ class ExperimentsTest extends \PHPUnit\Framework\TestCase
 
     public function testGetTimestampThisMonth(): void
     {
-        $this->assertEquals(4, $this->Experiments->getTimestampLastMonth());
+        $this->assertEquals(5, $this->Experiments->getTimestampLastMonth());
     }
 
     public function testUpdateJsonField(): void

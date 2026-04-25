@@ -18,7 +18,7 @@ use Defuse\Crypto\Key;
 use Elabftw\AuditEvent\ConfigModified;
 use Elabftw\Elabftw\Env;
 use Elabftw\Elabftw\S3Config;
-use Elabftw\Elabftw\Update;
+use Elabftw\Elabftw\SchemaVersionChecker;
 use Elabftw\Enums\Action;
 use Elabftw\Enums\BasePermissions;
 use Elabftw\Exceptions\AppException;
@@ -31,6 +31,12 @@ use Override;
 use function array_map;
 use function urlencode;
 use function in_array;
+use function array_key_exists;
+use function count;
+use function dirname;
+use function file_get_contents;
+use function sprintf;
+use function str_starts_with;
 
 /**
  * The general config table
@@ -58,10 +64,18 @@ final class Config extends AbstractRest
 
     /**
      * Insert the default values in the sql config table
-     * Only run once of first ever page load
+     * Only run once on first ever page load
      */
     public function create(): bool
     {
+        $logoHeaderSvg = file_get_contents(dirname(__DIR__, 2) . '/web/assets/images/logo-header.svg');
+        $logoLightSvg = file_get_contents(dirname(__DIR__, 2) . '/web/assets/images/logo-light.svg');
+        $logoDarkSvg = file_get_contents(dirname(__DIR__, 2) . '/web/assets/images/logo-dark.svg');
+        $faviconSvg = file_get_contents(dirname(__DIR__, 2) . '/web/assets/images/favicon.svg');
+        if ($logoHeaderSvg === false || $logoLightSvg === false || $logoDarkSvg === false || $faviconSvg === false) {
+            throw new AppException('Could not load default branding SVG assets.', 500);
+        }
+
         $sql = "INSERT INTO `config` (`conf_name`, `conf_value`) VALUES
             ('admin_validate', '1'),
             ('admin_panel_custom_msg', ''),
@@ -161,6 +175,7 @@ final class Config extends AbstractRest
             ('ldap_toggle', '0'),
             ('ldap_scheme', 'ldap'),
             ('ldap_search_attr', 'mail'),
+            ('ldap_team_create', '0'),
             ('ldap_host', ''),
             ('ldap_port', '389'),
             ('ldap_base_dn', ''),
@@ -169,6 +184,7 @@ final class Config extends AbstractRest
             ('ldap_email', 'mail'),
             ('ldap_lastname', 'cn'),
             ('ldap_firstname', 'givenname'),
+            ('ldap_sync_teams', '0'),
             ('ldap_team', 'on'),
             ('ldap_use_tls', '0'),
             ('uploads_storage', '1'),
@@ -208,10 +224,18 @@ final class Config extends AbstractRest
             ('users_validity_is_externally_managed', '0'),
             ('dspace_host', ''),
             ('dspace_user', ''),
-            ('dspace_password', '')";
+            ('dspace_password', ''),
+            ('logo_header_svg', :logo_header_svg),
+            ('logo_light_svg', :logo_light_svg),
+            ('logo_dark_svg', :logo_dark_svg),
+            ('favicon_svg', :favicon_svg)";
 
         $req = $this->Db->prepare($sql);
-        $req->bindValue(':schema', Update::REQUIRED_SCHEMA);
+        $req->bindValue(':schema', SchemaVersionChecker::REQUIRED_SCHEMA);
+        $req->bindValue(':logo_header_svg', $logoHeaderSvg);
+        $req->bindValue(':logo_light_svg', $logoLightSvg);
+        $req->bindValue(':logo_dark_svg', $logoDarkSvg);
+        $req->bindValue(':favicon_svg', $faviconSvg);
 
         return $this->Db->execute($req);
     }

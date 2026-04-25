@@ -13,10 +13,13 @@ declare(strict_types=1);
 namespace Elabftw\Elabftw;
 
 use Elabftw\Enums\EntityType;
+use Elabftw\Enums\AccessType;
 use Elabftw\Exceptions\AppException;
 use Elabftw\Models\Revisions;
 use Exception;
 use Symfony\Component\HttpFoundation\Response;
+
+use function _;
 
 /**
  * Show history of body of experiment or db item
@@ -29,7 +32,7 @@ try {
     $Response->prepare($App->Request);
     $Entity = EntityType::from($App->Request->query->getString('type'))->toInstance($App->Users);
     $Entity->setId($App->Request->query->getInt('item_id'));
-    $Entity->canOrExplode('read');
+    $Entity->canOrExplode(AccessType::Read);
 
     $revisionsArr = new Revisions(
         $Entity,

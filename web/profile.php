@@ -23,6 +23,9 @@ use Exception;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Response;
 
+use function _;
+use function ini_get;
+
 /**
  * Display profile of current user
  */
@@ -48,7 +51,7 @@ try {
     $ExperimentsCategories = new ExperimentsCategories($App->Teams);
 
     // get the exported files
-    $Export = new Exports($App->Users, Storage::EXPORTS->getStorage());
+    $Export = new Exports($App::getDefaultLogger(), $App->Users, Storage::EXPORTS->getStorage());
 
     $UserUploads = new UserUploads($App->Users);
     $PermissionsHelper = new PermissionsHelper();

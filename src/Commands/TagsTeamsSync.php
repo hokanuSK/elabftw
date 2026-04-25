@@ -24,6 +24,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Override;
 
+use function implode;
+use function sprintf;
+
 /**
  * Synchronize tags between teams
  */
@@ -67,7 +70,7 @@ final class TagsTeamsSync extends Command
         $Db = Db::getConnection();
         $sql = 'SELECT DISTINCT tag FROM tags WHERE team IN ( ' . implode(',', $teams) . ' )';
         $req = $Db->prepare($sql);
-        $req->execute();
+        $Db->execute($req);
         return $req->fetchAll(PDO::FETCH_COLUMN);
     }
 }

@@ -14,6 +14,7 @@ namespace Elabftw\Elabftw;
 
 use Elabftw\Enums\Language;
 use Elabftw\Enums\Messages;
+use Elabftw\Enums\ThemeVariant;
 use Elabftw\Exceptions\IllegalActionException;
 use Elabftw\Exceptions\UnauthorizedException;
 use Elabftw\Models\Users\AnonymousUser;
@@ -43,6 +44,9 @@ use function intdiv;
 use function putenv;
 use function setlocale;
 use function textdomain;
+use function array_merge;
+use function bind_textdomain_codeset;
+use function sprintf;
 
 /**
  * This is a super class holding various global objects
@@ -50,13 +54,6 @@ use function textdomain;
 final class App
 {
     use TwigTrait;
-
-    public const string INSTALLED_VERSION = '5.3.11';
-
-    // this version format is used to compare with last_seen_version of users
-    // major is untouched, and minor and patch are padded with one 0 each
-    // we should be pretty safe from ever reaching 100 as a minor or patch version!
-    public const int INSTALLED_VERSION_INT = 50311;
 
     /** @psalm-suppress PossiblyUnusedProperty this property is used in twig templates */
     public array $notifsArr = array();
@@ -206,6 +203,18 @@ final class App
         $Response->setContent($this->render($template, $renderArr));
         $Response->setStatusCode($error->toHttpCode());
         return $Response;
+    }
+
+    public function getThemeVariant(): ThemeVariant
+    {
+        // 1. authenticated user preference
+        if ($this->Users instanceof AuthenticatedUser) {
+            return ThemeVariant::tryFrom((int) $this->Users->userData['theme_variant'])
+                ?? ThemeVariant::Auto;
+        }
+        // 2. anon & guest preference (cookie)
+        $cookie = $this->Request->cookies->getInt('theme_variant');
+        return ThemeVariant::tryFrom($cookie) ?? ThemeVariant::Auto;
     }
 
     /**
