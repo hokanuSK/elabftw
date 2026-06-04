@@ -10,7 +10,11 @@
   {# left part, full height: checkbox #}
   <div class='d-flex align-items-start mt-1'>
     {# checkbox #}
-    <input autocomplete='off' type='checkbox' data-action='checkbox-entity' data-id='{{ item.id }}' data-randomid='{{ randomId }}' data-type='{{ Entity.entityType.value }}' data-state='{{ item.state }}' aria-label='{{ 'Select'|trans }}' class='mr-3' />
+    {% if not item.is_demo|default(false) %}
+      <input autocomplete='off' type='checkbox' data-action='checkbox-entity' data-id='{{ item.id }}' data-randomid='{{ randomId }}' data-type='{{ Entity.entityType.value }}' data-state='{{ item.state }}' aria-label='{{ 'Select'|trans }}' class='mr-3' />
+    {% else %}
+      <i class='fas fa-flask fa-fw mr-3 text-muted' title='Demo example'></i>
+    {% endif %}
   </div>
 
   {# middle part: category, status, title, icons and tags #}
@@ -50,7 +54,11 @@
       {% if item.custom_id %}
         <span class='mr-1 text-nowrap' title='{{ 'Custom ID'|trans }}'>{{ item.custom_id }}</span>
       {% endif %}
-      <a href='{{ Entity.entityType.toPage }}?mode=view&amp;id={{ item.id }}'>{{ item.title }}</a>
+      {% if item.is_demo|default(false) %}
+        <span>{{ item.title }}</span>
+      {% else %}
+        <a href='{{ Entity.entityType.toPage }}?mode=view&amp;id={{ item.id }}'>{{ item.title }}</a>
+      {% endif %}
     </div>
     {# owner #}
     <div class='owner'>
@@ -73,12 +81,32 @@
       </p>
     {% endif %}
 
+    {% if item.list_state_title %}
+      <p class='item-next my-2'>
+        <span class='text-uppercase'>{{ 'State'|trans }}:</span>
+        <span class='catstat-btn status-btn ml-1' style='--bg: #{{ item.list_state_color|default('bdbdbd') }}'>
+          {% if item.fleet_runtime_state %}
+            <i class='fas fa-microchip fa-fw'></i>
+          {% else %}
+            <i class='fas fa-circle fa-fw' style='--bg: #{{ item.list_state_color|default('bdbdbd') }}'></i>
+          {% endif %}
+          {{ item.list_state_title }}
+        </span>
+      </p>
+    {% endif %}
+
     <p class='my-2'>
-      {% set itemtagsArr = tagsArr[item.id] %}
+      {% set itemtagsArr = item.is_demo|default(false) ? [] : tagsArr[item.id] %}
       {% if itemtagsArr|length > 0 %}
         <span class='d-inline-flex flex-wrap'><i class='fas fa-tags mr-1 fa-fw'></i>
           {% for tag in itemtagsArr %}
             <a class='tag mathjax-ignore margin-1px {{ tag.is_favorite ? 'favorite' }}' href='{{ Entity.entityType.toPage }}?mode=show&amp;tags%5B%5D={{ tag.tag|url_encode }}'>{{ tag.tag }}</a>
+          {% endfor %}
+        </span>
+      {% elseif item.is_demo|default(false) and item.demo_tags|default([])|length > 0 %}
+        <span class='d-inline-flex flex-wrap'><i class='fas fa-tags mr-1 fa-fw'></i>
+          {% for tag in item.demo_tags %}
+            <span class='tag mathjax-ignore margin-1px'>{{ tag }}</span>
           {% endfor %}
         </span>
       {% endif %}
@@ -86,7 +114,7 @@
     {# toggle body #}
     <div class='d-flex flex-row'>
       {# for templates: create from button #}
-      {% if isTemplate %}
+      {% if isTemplate and not item.is_demo|default(false) %}
       <a data-action='create-entity' data-type={{ dataType }} data-tplid='{{ item.id }}' href='#' class='btn btn-primary left-icon mr-1' title='{{ label }}' aria-label='{{ label }}'>
         <i class='fas fa-file-circle-plus fa-fw'></i>
       </a>
@@ -101,6 +129,10 @@
       <div class='btn btn-secondary mr-1 lh-normal p-2 border-0' data-action='restore-entity-showmode' title='{{ 'Restore entry'|trans }}' data-endpoint='{{ Entity.entityType.value }}' data-id='{{ item.id }}'>
           <i class='fas fa-trash-can-arrow-up fa-fw'></i>
         </div>
+      {% elseif item.is_demo|default(false) %}
+        <div class='btn btn-secondary left-icon mr-1 disabled'>
+          <i class='fas fa-eye fa-fw'></i>
+        </div>
       {% else %}
         {# edit icon #}
         {% if (item.userid == App.Users.userData.userid or Entity.entityType.value == 'items' or App.Users.isAdmin) %}
@@ -114,9 +146,11 @@
           </a>
         {% endif %}
       {% endif %}
-      <button type='button' class='btn btn-neutral mr-2' data-type='{{ Entity.entityType.value }}' data-id='{{ item.id }}' data-opened-icon='fa-caret-down' data-closed-icon='fa-caret-right' data-randid={{ randomId }} data-action='toggle-body' title='{{ 'Toggle content'|trans }}' aria-label='{{ 'Toggle content'|trans }}'>
-        <i class='fas fa-caret-right fa-fw'></i>
-      </button>
+      {% if not item.is_demo|default(false) %}
+        <button type='button' class='btn btn-neutral mr-2' data-type='{{ Entity.entityType.value }}' data-id='{{ item.id }}' data-opened-icon='fa-caret-down' data-closed-icon='fa-caret-right' data-randid={{ randomId }} data-action='toggle-body' title='{{ 'Toggle content'|trans }}' aria-label='{{ 'Toggle content'|trans }}'>
+          <i class='fas fa-caret-right fa-fw'></i>
+        </button>
+      {% endif %}
       {# date #}
       <div class='d-flex flex-column small'>
         <span class='item-date'>{{ statusDateLabel }} {{ dateValue|date('Y-m-d') }}</span>
@@ -135,7 +169,9 @@
   {# third part: end container #}
   <div class='d-flex justify-content-end ml-auto text-nowrap'>
     <div>
-      {% include 'toggle-pin.html' with {'padding': 2, 'is_pinned': item.is_pinned, 'id': item.id} %}
+      {% if not item.is_demo|default(false) %}
+        {% include 'toggle-pin.html' with {'padding': 2, 'is_pinned': item.is_pinned, 'id': item.id} %}
+      {% endif %}
     </div>
   </div>
 </section>

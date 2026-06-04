@@ -121,6 +121,7 @@ final class EntitySqlBuilder implements SqlBuilderInterface
                 entity.date,
                 entity.category,
                 entity.status,
+                entity.metadata,
                 entity.team,
                 entity.rating,
                 entity.userid,
